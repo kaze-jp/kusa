@@ -3,12 +3,18 @@ mod window_presets;
 
 use std::io::IsTerminal;
 use std::path::PathBuf;
+use std::sync::Mutex;
 use tauri::{Emitter, WebviewWindowBuilder, WebviewUrl, Manager, RunEvent};
 use tauri_plugin_cli::CliExt;
 use window_presets::{PeekConfig, FULL_SIZE, PEEK_MIN_SIZE, resolve_preset};
 
+/// Stores the window mode so the frontend can query it via a Tauri command.
+#[derive(Debug, Default)]
+pub struct WindowModeState(pub Mutex<String>);
+
 /// Determine PeekConfig from CLI args and stdin state.
-fn resolve_peek_config(matches: &tauri_plugin_cli::Matches) -> PeekConfig {
+/// `screen_width` and `screen_height` are used for the "half" preset.
+fn resolve_peek_config(matches: &tauri_plugin_cli::Matches, screen_width: f64, screen_height: f64) -> PeekConfig {
     let has_peek_flag = matches
         .args
         .get("peek")
@@ -58,8 +64,7 @@ fn resolve_peek_config(matches: &tauri_plugin_cli::Matches) -> PeekConfig {
     // Resolve size preset (default depends on mode)
     let default_preset = if is_peek { "peek" } else { "full" };
     let preset_name = size_preset.as_deref().unwrap_or(default_preset);
-    // Use a fallback screen size; half preset will use these values
-    let size = resolve_preset(preset_name, 1920.0, 1080.0);
+    let size = resolve_preset(preset_name, screen_width, screen_height);
 
     PeekConfig {
         is_peek,
@@ -69,6 +74,7 @@ fn resolve_peek_config(matches: &tauri_plugin_cli::Matches) -> PeekConfig {
 }
 
 /// Create the application window based on peek configuration.
+/// On fallback from peek to full mode, updates the managed `WindowModeState`.
 fn create_window(app: &tauri::App, peek_config: &PeekConfig) -> Result<(), Box<dyn std::error::Error>> {
     if peek_config.is_peek {
         // Peek mode: small, no decorations, always on top, transparent for border-radius
@@ -103,7 +109,10 @@ fn create_window(app: &tauri::App, peek_config: &PeekConfig) -> Result<(), Box<d
                     .visible(false)
                     .build()?;
                 fallback.show().ok();
-                // Emit full mode even though peek was requested (fallback)
+                // Update managed state and emit full mode (fallback)
+                if let Ok(mut mode) = app.state::<WindowModeState>().0.lock() {
+                    *mode = "full".to_string();
+                }
                 app.emit("window-mode", "full").ok();
                 return Ok(());
             }
@@ -149,6 +158,7 @@ pub fn run() {
         .manage(commands::StdinState {
             content: stdin_content,
         })
+        .manage(WindowModeState::default())
         .invoke_handler(tauri::generate_handler![
             commands::read_file,
             commands::list_md_files,
@@ -159,6 +169,7 @@ pub fn run() {
             commands::save_preference,
             commands::load_preference,
             commands::promote_to_full,
+            commands::get_window_mode,
         ])
         .plugin(
             tauri_plugin_single_instance::init(|app, args, _cwd| {
@@ -174,6 +185,20 @@ pub fn run() {
         .plugin(tauri_plugin_cli::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
+            // Get actual monitor dimensions for the "half" preset.
+            // Falls back to 1920x1080 if the primary monitor cannot be detected.
+            let (screen_width, screen_height) = app
+                .primary_monitor()
+                .ok()
+                .flatten()
+                .map(|m| {
+                    let size = m.size();
+                    let scale = m.scale_factor();
+                    // Convert physical pixels to logical pixels
+                    (size.width as f64 / scale, size.height as f64 / scale)
+                })
+                .unwrap_or((1920.0, 1080.0));
+
             // Parse CLI arguments
             let (file_path, clipboard_flag, peek_config) = if let Ok(matches) = app.cli().matches() {
                 let file = matches.args.get("file").and_then(|a| {
@@ -194,20 +219,27 @@ pub fn run() {
                     .map(|a| a.value == serde_json::Value::Bool(true))
                     .unwrap_or(false);
 
-                let config = resolve_peek_config(&matches);
+                let config = resolve_peek_config(&matches, screen_width, screen_height);
                 (file, clipboard, config)
             } else {
                 (None, false, PeekConfig::default())
             };
 
-            // Emit window mode to frontend
+            // Store window mode in managed state so the frontend can query it
             let mode_str = if peek_config.is_peek { "peek" } else { "full" };
-            let _ = app.emit("window-mode", mode_str);
+            {
+                let state = app.state::<WindowModeState>();
+                let mut mode = state.0.lock().expect("window mode lock poisoned");
+                *mode = mode_str.to_string();
+            }
 
-            // Create the window
+            // Create the window FIRST so the frontend exists to receive events
             if let Err(e) = create_window(app, &peek_config) {
                 eprintln!("Fatal: failed to create window: {}", e);
             }
+
+            // Emit window mode AFTER window creation so the frontend can receive it
+            let _ = app.emit("window-mode", mode_str);
 
             // Emit CLI args to frontend
             let mut cli_data = serde_json::Map::new();

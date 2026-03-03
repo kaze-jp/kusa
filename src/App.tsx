@@ -7,7 +7,7 @@ import {
   onMount,
   Show,
 } from "solid-js";
-import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { processMarkdown, extractHeadings } from "./lib/markdown";
 import { useActiveHeading } from "./lib/useActiveHeading";
@@ -196,22 +196,18 @@ const App: Component = () => {
     activeId
   );
 
-  // Initialize window mode from Rust backend event, then show window
+  // Initialize window mode from Rust backend, then show window
   onMount(async () => {
-    // Listen for window mode from Rust backend
-    await listen<string>("window-mode", (event) => {
-      const mode = event.payload as WindowMode;
+    // Query window mode from Rust backend via command (reliable, no race condition)
+    try {
+      const mode = (await invoke<string>("get_window_mode")) as WindowMode;
       initWindowMode(mode);
       setModeReady(true);
-    });
-
-    // If no event received within 100ms, default to full mode
-    setTimeout(() => {
-      if (!modeReady()) {
-        initWindowMode("full");
-        setModeReady(true);
-      }
-    }, 100);
+    } catch (err) {
+      console.error("Failed to get window mode, defaulting to full:", err);
+      initWindowMode("full");
+      setModeReady(true);
+    }
 
     // Show window once the frontend is ready
     getCurrentWindow().show();
