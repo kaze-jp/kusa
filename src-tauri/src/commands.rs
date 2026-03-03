@@ -1,6 +1,24 @@
-use serde::Serialize;
+use base64::Engine;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::time::UNIX_EPOCH;
+
+/// Shared type for all input sources (file, stdin, clipboard, github, url)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InputContent {
+    pub source: String,
+    pub content: String,
+    pub title: String,
+    pub file_path: Option<String>,
+}
+
+/// State holder for stdin content, read before Tauri init
+pub struct StdinState {
+    pub content: Option<InputContent>,
+}
+
+// --- Existing commands ---
 
 #[tauri::command]
 pub fn read_file(path: String) -> Result<String, String> {
@@ -74,6 +92,198 @@ pub fn list_md_files(dir_path: String) -> Result<Vec<MdFileEntry>, String> {
     Ok(files)
 }
 
+// --- New commands for universal-input ---
+
+/// Read stdin content that was captured before Tauri init.
+/// Returns None if no stdin pipe was detected or content was empty.
+#[tauri::command]
+pub fn read_stdin(state: tauri::State<'_, StdinState>) -> Option<InputContent> {
+    state.content.clone()
+}
+
+/// Read text content from the system clipboard.
+#[tauri::command]
+pub async fn read_clipboard(
+    app: tauri::AppHandle,
+) -> Result<InputContent, String> {
+    use tauri_plugin_clipboard_manager::ClipboardExt;
+
+    let text = app
+        .clipboard()
+        .read_text()
+        .map_err(|e| format!("クリップボードの読み取りに失敗しました: {}", e))?;
+
+    if text.trim().is_empty() {
+        return Err("クリップボードにテキストが見つかりません".to_string());
+    }
+
+    Ok(InputContent {
+        source: "clipboard".to_string(),
+        content: text,
+        title: "(clipboard)".to_string(),
+        file_path: None,
+    })
+}
+
+/// GitHub Contents API response structure
+#[derive(Debug, Deserialize)]
+struct GitHubContentsResponse {
+    content: String,
+    encoding: String,
+    #[allow(dead_code)]
+    name: String,
+}
+
+/// Decode base64-encoded content from GitHub API
+fn decode_github_content(response: &GitHubContentsResponse) -> Result<String, String> {
+    if response.encoding != "base64" {
+        return Err(format!(
+            "サポートされていないエンコーディング: {}",
+            response.encoding
+        ));
+    }
+
+    let cleaned = response.content.replace('\n', "").replace('\r', "");
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(&cleaned)
+        .map_err(|e| format!("base64 デコードエラー: {}", e))?;
+    String::from_utf8(bytes).map_err(|e| format!("UTF-8 デコードエラー: {}", e))
+}
+
+/// Fetch content from a URL. If is_github_api is true, parse as GitHub Contents API response.
+#[tauri::command]
+pub async fn fetch_url(
+    url: String,
+    is_github_api: bool,
+    title: String,
+) -> Result<InputContent, String> {
+    // Validate URL scheme
+    if !url.starts_with("http://") && !url.starts_with("https://") {
+        return Err(format!(
+            "サポートされていないURLスキーム。http:// または https:// のみ対応: {}",
+            url
+        ));
+    }
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .user_agent("kusa-md-viewer")
+        .build()
+        .map_err(|e| format!("HTTPクライアントの構築に失敗しました: {}", e))?;
+
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| {
+            if e.is_timeout() {
+                "リクエストがタイムアウトしました（10秒）".to_string()
+            } else if e.is_connect() {
+                format!("ネットワーク接続エラー: {}", e)
+            } else {
+                format!("ネットワーク接続エラー: {}", e)
+            }
+        })?;
+
+    let status = response.status();
+
+    if !status.is_success() {
+        // Check for GitHub rate limit
+        if status.as_u16() == 403 {
+            let rate_remaining = response
+                .headers()
+                .get("x-ratelimit-remaining")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.parse::<u64>().ok());
+
+            let rate_reset = response
+                .headers()
+                .get("x-ratelimit-reset")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.parse::<u64>().ok());
+
+            if rate_remaining == Some(0) {
+                let wait_msg = if let Some(reset) = rate_reset {
+                    let now = std::time::SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
+                    let minutes = if reset > now {
+                        (reset - now + 59) / 60
+                    } else {
+                        1
+                    };
+                    format!(
+                        "GitHub API レート制限に到達しました。約 {} 分後にリトライしてください",
+                        minutes
+                    )
+                } else {
+                    "GitHub API レート制限に到達しました。しばらく待ってからリトライしてください"
+                        .to_string()
+                };
+                return Err(wait_msg);
+            }
+        }
+
+        if status.as_u16() == 404 {
+            return Err(if is_github_api {
+                "リポジトリまたはファイルが見つかりません".to_string()
+            } else {
+                format!("ページが見つかりません (404): {}", url)
+            });
+        }
+
+        return Err(format!("HTTP エラー {}: {}", status.as_u16(), status.canonical_reason().unwrap_or("Unknown")));
+    }
+
+    let source = if is_github_api { "github" } else { "url" };
+
+    let content = if is_github_api {
+        let gh_response: GitHubContentsResponse = response
+            .json()
+            .await
+            .map_err(|e| format!("GitHub APIレスポンスのパースに失敗しました: {}", e))?;
+        decode_github_content(&gh_response)?
+    } else {
+        response
+            .text()
+            .await
+            .map_err(|e| format!("レスポンス本文の読み取りに失敗しました: {}", e))?
+    };
+
+    Ok(InputContent {
+        source: source.to_string(),
+        content,
+        title,
+        file_path: None,
+    })
+}
+
+/// Read stdin if it's connected to a pipe (not a terminal).
+/// Must be called before Tauri builder init.
+/// Returns None if stdin is a terminal or content is empty.
+pub fn read_stdin_if_piped() -> Option<InputContent> {
+    use is_terminal::IsTerminal;
+    use std::io::Read;
+
+    if std::io::stdin().is_terminal() {
+        return None;
+    }
+
+    let mut buffer = String::new();
+    // Limit to 10MB to prevent memory exhaustion
+    let limit = 10 * 1024 * 1024;
+    match std::io::stdin().take(limit).read_to_string(&mut buffer) {
+        Ok(_) if !buffer.trim().is_empty() => Some(InputContent {
+            source: "stdin".to_string(),
+            content: buffer,
+            title: "(stdin)".to_string(),
+            file_path: None,
+        }),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -114,7 +324,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         fs::write(dir.path().join("readme.md"), "# Readme").unwrap();
         fs::write(dir.path().join("notes.markdown"), "# Notes").unwrap();
-        fs::write(dir.path().join("page.mdx"), "# Page").unwrap();
+        fs::write(dir.path().join("page.mdx"), "export default MDXPage").unwrap();
         fs::write(dir.path().join("code.rs"), "fn main() {}").unwrap();
 
         let result = list_md_files(dir.path().to_string_lossy().to_string());
@@ -139,5 +349,114 @@ mod tests {
         let result = list_md_files("/nonexistent/directory".to_string());
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Cannot resolve directory"));
+    }
+
+    // --- InputContent tests ---
+
+    #[test]
+    fn test_input_content_serialization() {
+        let content = InputContent {
+            source: "stdin".to_string(),
+            content: "# Hello".to_string(),
+            title: "(stdin)".to_string(),
+            file_path: None,
+        };
+        let json = serde_json::to_string(&content).unwrap();
+        assert!(json.contains("\"source\":\"stdin\""));
+        assert!(json.contains("\"filePath\":null"));
+    }
+
+    #[test]
+    fn test_input_content_with_file_path() {
+        let content = InputContent {
+            source: "file".to_string(),
+            content: "# Test".to_string(),
+            title: "test.md".to_string(),
+            file_path: Some("/path/to/test.md".to_string()),
+        };
+        let json = serde_json::to_string(&content).unwrap();
+        assert!(json.contains("\"source\":\"file\""));
+        assert!(json.contains("\"filePath\":\"/path/to/test.md\""));
+    }
+
+    // --- GitHub base64 decode tests ---
+
+    #[test]
+    fn test_decode_github_content_success() {
+        let response = GitHubContentsResponse {
+            content: base64::engine::general_purpose::STANDARD.encode("# Hello World"),
+            encoding: "base64".to_string(),
+            name: "README.md".to_string(),
+        };
+        let result = decode_github_content(&response);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "# Hello World");
+    }
+
+    #[test]
+    fn test_decode_github_content_with_newlines() {
+        // GitHub API returns base64 with newline characters inserted
+        let raw = base64::engine::general_purpose::STANDARD.encode("# Hello\nWorld\n\nThis is a test");
+        let with_newlines = raw
+            .chars()
+            .enumerate()
+            .flat_map(|(i, c)| {
+                if i > 0 && i % 60 == 0 {
+                    vec!['\n', c]
+                } else {
+                    vec![c]
+                }
+            })
+            .collect::<String>();
+
+        let response = GitHubContentsResponse {
+            content: with_newlines,
+            encoding: "base64".to_string(),
+            name: "test.md".to_string(),
+        };
+        let result = decode_github_content(&response);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "# Hello\nWorld\n\nThis is a test");
+    }
+
+    #[test]
+    fn test_decode_github_content_unsupported_encoding() {
+        let response = GitHubContentsResponse {
+            content: "not base64".to_string(),
+            encoding: "utf-8".to_string(),
+            name: "test.md".to_string(),
+        };
+        let result = decode_github_content(&response);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .contains("サポートされていないエンコーディング"));
+    }
+
+    #[test]
+    fn test_decode_github_content_invalid_base64() {
+        let response = GitHubContentsResponse {
+            content: "not-valid-base64!!!".to_string(),
+            encoding: "base64".to_string(),
+            name: "test.md".to_string(),
+        };
+        let result = decode_github_content(&response);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("base64 デコードエラー"));
+    }
+
+    #[test]
+    fn test_decode_github_content_invalid_utf8() {
+        // Encode invalid UTF-8 bytes
+        let invalid_bytes: Vec<u8> = vec![0xFF, 0xFE, 0xFD];
+        let encoded = base64::engine::general_purpose::STANDARD.encode(&invalid_bytes);
+        let response = GitHubContentsResponse {
+            content: encoded,
+            encoding: "base64".to_string(),
+            name: "test.md".to_string(),
+        };
+        let result = decode_github_content(&response);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("UTF-8 デコードエラー"));
     }
 }
