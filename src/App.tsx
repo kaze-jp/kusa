@@ -6,6 +6,8 @@ import {
   onCleanup,
   onMount,
   Show,
+  Switch,
+  Match,
 } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -19,6 +21,10 @@ import { useFocusMode } from "./lib/useFocusMode";
 import { useTheme } from "./lib/useTheme";
 import { useZoom } from "./lib/useZoom";
 import { createTabStore } from "./lib/tabStore";
+import { resolveInputSource } from "./lib/input-resolver";
+import { updateWindowTitle } from "./lib/title-bar";
+import { createBufferManager } from "./lib/buffer";
+import type { InputContent, CliArgs } from "./lib/types";
 import Preview from "./components/Preview";
 import TOCPanel from "./components/TOCPanel";
 import HeadingPicker from "./components/HeadingPicker";
@@ -27,166 +33,23 @@ import PeekShell from "./components/PeekShell";
 import SearchBar from "./components/SearchBar";
 import FileList, { type MdFileEntry } from "./components/FileList";
 import TabBar from "./components/TabBar";
+import ErrorDisplay from "./components/ErrorDisplay";
+import DropZone from "./components/DropZone";
 import {
   initWindowMode,
   isPeekMode,
   type WindowMode,
 } from "./stores/windowMode";
 
-// Demo content for development
-const DEMO_MARKDOWN = `# kusa — Markdown Reader
-
-A beautiful Markdown reader for AI developers.
-
-## Features
-
-### TOC Navigation
-
-The table of contents panel on the left shows the document structure. Click any heading to jump directly to that section.
-
-### Vim-Style Navigation
-
-- \`gd\` — Open heading picker
-- \`]]\` — Jump to next heading
-- \`[[\` — Jump to previous heading
-- \`gg\` — Scroll to top
-- \`G\` — Scroll to bottom
-
-### GFM Support
-
-#### Tables
-
-| Feature | Status |
-|---------|--------|
-| Tables | ✅ Supported |
-| Checklists | ✅ Supported |
-| Footnotes | ✅ Supported |
-| Strikethrough | ✅ Supported |
-
-#### Task Lists
-
-- [x] Markdown parsing
-- [x] GFM support
-- [x] Syntax highlighting
-- [ ] Mermaid diagrams
-- [ ] KaTeX math
-
-#### Blockquotes
-
-> "Ghostty がターミナル体験を再定義したように、kusa が Markdown 体験を再定義する"
-
-#### Footnotes
-
-This is a sentence with a footnote[^1].
-
-[^1]: This is the footnote content.
-
-#### Strikethrough
-
-~~This text is deleted~~ and this is not.
-
-### Code Blocks
-
-\`\`\`typescript
-interface HeadingInfo {
-  id: string;
-  text: string;
-  level: number;
-  index: number;
-}
-
-function extractHeadings(markdown: string): HeadingInfo[] {
-  const tree = parser.parse(markdown);
-  return tree.children
-    .filter(node => node.type === "heading")
-    .map((node, index) => ({
-      id: generateSlug(node.text),
-      text: node.text,
-      level: node.depth,
-      index,
-    }));
-}
-\`\`\`
-
-\`\`\`rust
-#[tauri::command]
-fn save_preference(
-    app: tauri::AppHandle,
-    key: String,
-    value: String,
-) -> Result<(), String> {
-    let config_dir = app.path().config_dir()
-        .map_err(|e| e.to_string())?;
-    let prefs_path = config_dir.join("kusa/preferences.json");
-    // ... implementation
-    Ok(())
-}
-\`\`\`
-
-\`\`\`python
-def process_markdown(content: str) -> str:
-    """Convert markdown to HTML with syntax highlighting."""
-    import markdown
-    extensions = ['fenced_code', 'tables', 'toc']
-    return markdown.markdown(content, extensions=extensions)
-\`\`\`
-
-### Keyboard Shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| \`Ctrl+T\` | Toggle theme (dark/light) |
-| \`Ctrl+B\` | Toggle TOC panel |
-| \`Cmd+F\` | Document search |
-| \`/\` | Document search (Vim) |
-| \`Cmd+Shift+F\` | Toggle focus mode |
-| \`gd\` | Open heading picker |
-| \`]]\` | Next heading |
-| \`[[\` | Previous heading |
-
-### Theme Support
-
-The editor supports both **dark** and **light** themes. Press \`Ctrl+T\` to toggle.
-
-Theme preference is persisted across sessions.
-
-## はじめに
-
-日本語の見出しもサポートしています。TOCパネルで確認できます。
-
-## Architecture
-
-### Frontend (SolidJS)
-
-The frontend uses **SolidJS** for fine-grained reactivity:
-
-- \`Preview\` — Renders sanitized HTML
-- \`TOCPanel\` — Hierarchical heading navigation
-- \`HeadingPicker\` — Fuzzy heading search overlay
-- \`ReadingProgress\` — Scroll progress indicator
-
-### Backend (Rust / Tauri)
-
-Minimal Rust backend:
-
-- File I/O
-- CLI argument parsing
-- Preference persistence
-
-## Conclusion
-
-kusa aims to be the definitive Markdown reading experience for terminal-native AI developers.
-`;
-
 /** View mode for the top-level layout */
-type AppViewMode = "demo" | "file-list" | "preview";
+type AppViewMode = "loading" | "demo" | "file-list" | "preview" | "buffer" | "error";
 
 const App: Component = () => {
   // Window mode initialization
   const [modeReady, setModeReady] = createSignal(false);
 
-  // View mode: demo (no CLI args), file-list (directory mode), preview (file open)
-  const [viewMode, setViewMode] = createSignal<AppViewMode>("demo");
+  // View mode
+  const [viewMode, setViewMode] = createSignal<AppViewMode>("loading");
 
   // Directory state
   const [dirPath, setDirPath] = createSignal<string | null>(null);
@@ -196,10 +59,20 @@ const App: Component = () => {
   const tabStore = createTabStore();
 
   // Core state (for current active tab or demo)
-  const [markdown, setMarkdown] = createSignal(DEMO_MARKDOWN);
+  const [markdown, setMarkdown] = createSignal("");
   const [html, setHtml] = createSignal("");
   const [tocVisible, setTocVisible] = createSignal(true);
   const [searchOpen, setSearchOpen] = createSignal(false);
+
+  // Error state
+  const [errorMessage, setErrorMessage] = createSignal("");
+  const [errorHint, setErrorHint] = createSignal<string | undefined>(undefined);
+
+  // Buffer manager for universal input (stdin, clipboard, github, url)
+  const bufferManager = createBufferManager();
+
+  // Track whether initial input has been resolved to avoid race conditions
+  let initialInputResolved = false;
 
   // Preview container ref
   let previewRef: HTMLDivElement | undefined;
@@ -231,6 +104,9 @@ const App: Component = () => {
   async function setupTauriListeners() {
     // Listen for directory open
     const unlistenDir = await listen<string>("cli-open-dir", async (event) => {
+      // Only handle directory events if input hasn't been resolved to buffer mode
+      if (initialInputResolved) return;
+
       const dir = event.payload;
       setDirPath(dir);
       try {
@@ -253,9 +129,25 @@ const App: Component = () => {
       await openFileInTab(filePath);
     });
 
+    // Listen for CLI args (universal input: stdin, clipboard, gh:, URL)
+    const unlistenCliArgs = await listen<CliArgs>("cli-args", async (event) => {
+      const args = event.payload;
+      try {
+        const result = await resolveInputSource(args);
+        if (result) {
+          initialInputResolved = true;
+          displayBufferContent(result);
+        }
+      } catch (err) {
+        initialInputResolved = true;
+        handleInputError(err);
+      }
+    });
+
     onCleanup(() => {
       unlistenDir();
       unlistenFile();
+      unlistenCliArgs();
     });
   }
 
@@ -265,7 +157,6 @@ const App: Component = () => {
 
   /** Open a file by path, reading content and creating a tab */
   async function openFileInTab(filePath: string) {
-    // Extract filename from path
     const parts = filePath.split(/[\\/]/);
     const fileName = parts[parts.length - 1] || filePath;
 
@@ -273,6 +164,15 @@ const App: Component = () => {
       const content = await invoke<string>("read_file", { path: filePath });
       tabStore.openTab(filePath, fileName, content);
       setViewMode("preview");
+
+      // Update title bar
+      const fileContent: InputContent = {
+        source: "file",
+        content,
+        title: fileName,
+        filePath,
+      };
+      updateWindowTitle(fileContent);
     } catch (err) {
       console.error("Failed to read file:", err);
     }
@@ -283,18 +183,50 @@ const App: Component = () => {
     openFileInTab(path);
   }
 
+  /** Handle file drop */
+  function handleFileDrop(path: string) {
+    openFileInTab(path);
+  }
+
   /** Handle tab close */
   function handleTabClose(id: string) {
     const hasRemaining = tabStore.closeTab(id);
     if (!hasRemaining) {
-      // No tabs left: return to file list if in directory mode, else demo
       if (dirPath()) {
         setViewMode("file-list");
       } else {
         setViewMode("demo");
-        setMarkdown(DEMO_MARKDOWN);
+        setMarkdown("");
       }
     }
+  }
+
+  // -----------------------------------------------------------------------
+  // Universal input helpers
+  // -----------------------------------------------------------------------
+
+  /** Display resolved input content (stdin, clipboard, github, url) */
+  function displayBufferContent(content: InputContent) {
+    bufferManager.setContent(content);
+    setMarkdown(content.content);
+    setViewMode("buffer");
+    updateWindowTitle(content);
+  }
+
+  /** Handle errors from input resolution with source-specific hints */
+  function handleInputError(err: unknown) {
+    const errMsg = String(err);
+    setErrorMessage(errMsg);
+
+    if (errMsg.includes("形式が不正")) {
+      setErrorHint("Correct format: gh:owner/repo/path/to/file.md");
+    } else if (errMsg.includes("レート制限")) {
+      setErrorHint("GitHub API allows 60 requests per hour for unauthenticated access.");
+    } else {
+      setErrorHint(undefined);
+    }
+
+    setViewMode("error");
   }
 
   // -----------------------------------------------------------------------
@@ -312,13 +244,11 @@ const App: Component = () => {
   let previousTabId: string | null = null;
   createEffect(() => {
     const currentId = tabStore.activeTabId();
-    // Save scroll position of the previous tab
     if (previousTabId && previousTabId !== currentId && previewRef) {
       tabStore.saveScrollPosition(previousTabId, previewRef.scrollTop);
     }
     previousTabId = currentId;
 
-    // Restore scroll position of the new tab
     const tab = tabStore.activeTab();
     if (tab && previewRef) {
       requestAnimationFrame(() => {
@@ -334,27 +264,30 @@ const App: Component = () => {
   // -----------------------------------------------------------------------
 
   onMount(async () => {
-    // Query window mode from Rust backend via command (reliable, no race condition)
+    // 1. Initialize window mode
     try {
       const mode = (await invoke<string>("get_window_mode")) as WindowMode;
       initWindowMode(mode);
-      setModeReady(true);
     } catch (err) {
       console.error("Failed to get window mode, defaulting to full:", err);
       initWindowMode("full");
-      setModeReady(true);
     }
+    setModeReady(true);
 
-    // Setup Tauri event listeners
+    // 2. Setup Tauri event listeners
     await setupTauriListeners();
 
-    // Show window once the frontend is ready
+    // 3. Show window once the frontend is ready
     getCurrentWindow().show();
   });
 
   // Process markdown to HTML
   createEffect(async () => {
     const md = markdown();
+    if (!md) {
+      setHtml("");
+      return;
+    }
     const result = await processMarkdown(md);
     setHtml(result);
   });
@@ -364,7 +297,6 @@ const App: Component = () => {
     const _html = html(); // track
     if (!previewRef) return;
 
-    // Wait for DOM render
     requestAnimationFrame(() => {
       if (previewRef) {
         observe(previewRef);
@@ -405,7 +337,6 @@ const App: Component = () => {
         handleTabClose(activeId);
         return;
       }
-      // No tabs: close the window
       getCurrentWebviewWindow().close();
       return;
     }
@@ -446,7 +377,7 @@ const App: Component = () => {
       return;
     }
 
-    // Cmd+Shift+F / Ctrl+Shift+F: Toggle focus mode (moved from Ctrl+F)
+    // Cmd+Shift+F / Ctrl+Shift+F: Toggle focus mode
     if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === "f" || e.key === "F")) {
       e.preventDefault();
       focusMode.toggle();
@@ -534,6 +465,13 @@ const App: Component = () => {
     </>
   );
 
+  // Loading indicator
+  const LoadingView = () => (
+    <div class="h-full flex items-center justify-center">
+      <div class="text-zinc-500 text-lg animate-pulse">Loading...</div>
+    </div>
+  );
+
   // Full mode content layout
   const FullContent = () => (
     <div class="flex h-full flex-col">
@@ -547,16 +485,33 @@ const App: Component = () => {
 
       {/* Main content area */}
       <div class="flex-1 min-h-0">
-        <Show when={viewMode() === "file-list"}>
-          <FileList
-            files={fileList()}
-            onSelect={handleFileSelect}
-          />
-        </Show>
+        <Switch fallback={<LoadingView />}>
+          <Match when={viewMode() === "loading"}>
+            <LoadingView />
+          </Match>
 
-        <Show when={viewMode() === "preview" || viewMode() === "demo"}>
-          <PreviewContent />
-        </Show>
+          <Match when={viewMode() === "preview" || viewMode() === "demo" || viewMode() === "buffer"}>
+            <DropZone onFileDrop={handleFileDrop}>
+              <PreviewContent />
+            </DropZone>
+          </Match>
+
+          <Match when={viewMode() === "file-list"}>
+            <DropZone onFileDrop={handleFileDrop}>
+              <FileList
+                files={fileList()}
+                onSelect={handleFileSelect}
+              />
+            </DropZone>
+          </Match>
+
+          <Match when={viewMode() === "error"}>
+            <ErrorDisplay
+              message={errorMessage()}
+              hint={errorHint()}
+            />
+          </Match>
+        </Switch>
       </div>
     </div>
   );
@@ -568,17 +523,30 @@ const App: Component = () => {
         fallback={<FullContent />}
       >
         <PeekShell>
-          <div class="preview-wrapper">
-            <SearchBar
-              isOpen={searchOpen()}
-              onClose={() => setSearchOpen(false)}
-              getContainer={getPreviewRef}
-            />
-            <Preview
-              html={html()}
-              ref={(el) => (previewRef = el)}
-            />
-          </div>
+          <Switch fallback={<LoadingView />}>
+            <Match when={viewMode() === "loading"}>
+              <LoadingView />
+            </Match>
+            <Match when={viewMode() === "preview" || viewMode() === "buffer"}>
+              <div class="preview-wrapper">
+                <SearchBar
+                  isOpen={searchOpen()}
+                  onClose={() => setSearchOpen(false)}
+                  getContainer={getPreviewRef}
+                />
+                <Preview
+                  html={html()}
+                  ref={(el) => (previewRef = el)}
+                />
+              </div>
+            </Match>
+            <Match when={viewMode() === "error"}>
+              <ErrorDisplay
+                message={errorMessage()}
+                hint={errorHint()}
+              />
+            </Match>
+          </Switch>
         </PeekShell>
       </Show>
     </Show>
