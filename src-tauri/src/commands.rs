@@ -1,6 +1,8 @@
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::io::Write;
+use std::path::PathBuf;
 use std::time::UNIX_EPOCH;
 
 /// Shared type for all input sources (file, stdin, clipboard, github, url)
@@ -284,6 +286,67 @@ pub fn read_stdin_if_piped() -> Option<InputContent> {
     }
 }
 
+// --- New commands for inline-edit ---
+
+#[derive(Debug, Serialize)]
+pub struct WriteFileResult {
+    pub bytes_written: u64,
+}
+
+#[tauri::command]
+pub fn write_file(path: String, content: String) -> Result<WriteFileResult, String> {
+    // Resolve and canonicalize the path (parent must exist)
+    let target = PathBuf::from(&path);
+
+    let parent = target
+        .parent()
+        .ok_or_else(|| format!("Invalid path '{}': no parent directory", path))?;
+
+    let canonical_parent = fs::canonicalize(parent)
+        .map_err(|e| format!("Cannot resolve parent directory '{}': {}", parent.display(), e))?;
+
+    let file_name = target
+        .file_name()
+        .ok_or_else(|| format!("Invalid path '{}': no file name", path))?;
+
+    let canonical_path = canonical_parent.join(file_name);
+
+    // Atomic write: write to temp file, then rename
+    let temp_path = canonical_path.with_extension("tmp.kusa");
+
+    let bytes = content.as_bytes();
+
+    // Write content to temporary file
+    let mut file = fs::File::create(&temp_path)
+        .map_err(|e| format!("Cannot create temp file '{}': {}", temp_path.display(), e))?;
+
+    file.write_all(bytes).map_err(|e| {
+        // Clean up temp file on write failure
+        let _ = fs::remove_file(&temp_path);
+        format!("Cannot write to '{}': {}", temp_path.display(), e)
+    })?;
+
+    file.flush().map_err(|e| {
+        let _ = fs::remove_file(&temp_path);
+        format!("Cannot flush '{}': {}", temp_path.display(), e)
+    })?;
+
+    // Rename temp file to target (atomic on same filesystem)
+    fs::rename(&temp_path, &canonical_path).map_err(|e| {
+        let _ = fs::remove_file(&temp_path);
+        format!(
+            "Cannot rename '{}' to '{}': {}",
+            temp_path.display(),
+            canonical_path.display(),
+            e
+        )
+    })?;
+
+    Ok(WriteFileResult {
+        bytes_written: bytes.len() as u64,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -458,5 +521,61 @@ mod tests {
         let result = decode_github_content(&response);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("UTF-8 デコードエラー"));
+    }
+
+    // --- write_file tests ---
+
+    #[test]
+    fn test_write_file_success() {
+        let dir = TempDir::new().unwrap();
+        let file_path = dir.path().join("output.md");
+        // Create the file first so the path is valid
+        fs::write(&file_path, "").unwrap();
+
+        let content = "# Written\nBy kusa".to_string();
+        let result = write_file(file_path.to_string_lossy().to_string(), content.clone());
+        assert!(result.is_ok());
+        let res = result.unwrap();
+        assert_eq!(res.bytes_written, content.len() as u64);
+
+        // Verify file content
+        let read_back = fs::read_to_string(&file_path).unwrap();
+        assert_eq!(read_back, content);
+    }
+
+    #[test]
+    fn test_write_file_new_file() {
+        let dir = TempDir::new().unwrap();
+        let file_path = dir.path().join("new_file.md");
+
+        let content = "# New file".to_string();
+        let result = write_file(file_path.to_string_lossy().to_string(), content.clone());
+        assert!(result.is_ok());
+
+        let read_back = fs::read_to_string(&file_path).unwrap();
+        assert_eq!(read_back, content);
+    }
+
+    #[test]
+    fn test_write_file_nonexistent_parent() {
+        let result = write_file(
+            "/nonexistent/parent/dir/file.md".to_string(),
+            "content".to_string(),
+        );
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Cannot resolve parent"));
+    }
+
+    #[test]
+    fn test_write_file_no_temp_file_left() {
+        let dir = TempDir::new().unwrap();
+        let file_path = dir.path().join("clean.md");
+
+        let content = "# Clean".to_string();
+        let _ = write_file(file_path.to_string_lossy().to_string(), content);
+
+        // Ensure no .tmp.kusa file remains
+        let temp_path = file_path.with_extension("tmp.kusa");
+        assert!(!temp_path.exists());
     }
 }
