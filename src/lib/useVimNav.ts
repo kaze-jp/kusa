@@ -18,20 +18,30 @@ export interface VimNavActions {
   openPicker: () => void;
 }
 
+export interface VimNavOptions {
+  /** Callback for gt (next tab) */
+  onNextTab?: () => void;
+  /** Callback for gT (previous tab) */
+  onPrevTab?: () => void;
+}
+
 /**
  * Vim-style keyboard navigation for heading jumps.
  *
  * Supported sequences:
  * - `gd` -> Open heading picker
  * - `gg` -> Scroll to top
+ * - `gt` -> Next tab (if callback provided)
  * - `G`  -> Scroll to bottom
+ * - `gT` -> Previous tab (if callback provided)
  * - `]]` -> Jump to next heading
  * - `[[` -> Jump to previous heading
  */
 export function useVimNav(
   getContainer: () => HTMLElement | undefined,
   getHeadings: () => HeadingInfo[],
-  getActiveId: () => string | null
+  getActiveId: () => string | null,
+  options?: VimNavOptions
 ) {
   const [pickerOpen, setPickerOpen] = createSignal(false);
   let pendingKey: string | null = null;
@@ -133,6 +143,18 @@ export function useVimNav(
         case "gd":
           e.preventDefault();
           setPickerOpen(true);
+          return;
+        case "gt":
+          if (options?.onNextTab) {
+            e.preventDefault();
+            options.onNextTab();
+          }
+          return;
+        case "gT":
+          if (options?.onPrevTab) {
+            e.preventDefault();
+            options.onPrevTab();
+          }
           return;
         case "]]":
           e.preventDefault();
