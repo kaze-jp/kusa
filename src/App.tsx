@@ -24,6 +24,7 @@ import { createTabStore } from "./lib/tabStore";
 import { resolveInputSource } from "./lib/input-resolver";
 import { updateWindowTitle } from "./lib/title-bar";
 import { createBufferManager } from "./lib/buffer";
+import { createFileWatcher } from "./lib/fileWatcher";
 import type { InputContent, CliArgs } from "./lib/types";
 import Preview from "./components/Preview";
 import TOCPanel from "./components/TOCPanel";
@@ -74,6 +75,12 @@ const App: Component = () => {
   // Track whether initial input has been resolved to avoid race conditions
   let initialInputResolved = false;
 
+  // File watching state
+  const [fileNotification, setFileNotification] = createSignal<{
+    text: string;
+    type: "info" | "warning" | "error";
+  } | null>(null);
+
   // Preview container ref
   let previewRef: HTMLDivElement | undefined;
   const getPreviewRef = () => previewRef;
@@ -96,6 +103,29 @@ const App: Component = () => {
       onPrevTab: () => tabStore.prevTab(),
     }
   );
+
+  // File watcher: auto-reload preview when file changes externally
+  const fileWatcher = createFileWatcher({
+    onFileChanged(content, _path) {
+      setMarkdown(content);
+      setFileNotification({ text: "File updated externally", type: "info" });
+      setTimeout(() => setFileNotification(null), 3000);
+    },
+    onFileDeleted(path) {
+      setFileNotification({
+        text: `File deleted: ${path.split("/").pop() ?? path}`,
+        type: "error",
+      });
+    },
+    onConflict(_path) {
+      return true;
+    },
+    isDirty() {
+      return false;
+    },
+  });
+
+  onCleanup(() => fileWatcher.destroy());
 
   // -----------------------------------------------------------------------
   // Tauri event listeners
@@ -164,6 +194,7 @@ const App: Component = () => {
       const content = await invoke<string>("read_file", { path: filePath });
       tabStore.openTab(filePath, fileName, content);
       setViewMode("preview");
+      setFileNotification(null);
 
       // Update title bar
       const fileContent: InputContent = {
@@ -173,6 +204,9 @@ const App: Component = () => {
         filePath,
       };
       updateWindowTitle(fileContent);
+
+      // Start watching the file for external changes
+      await fileWatcher.watch(filePath);
     } catch (err) {
       console.error("Failed to read file:", err);
     }
@@ -430,9 +464,41 @@ const App: Component = () => {
   // Render
   // -----------------------------------------------------------------------
 
+  // Notification banner for file watch events
+  const FileNotification = () => (
+    <Show when={fileNotification()}>
+      {(notification) => {
+        const colorClass = () => {
+          switch (notification().type) {
+            case "error":
+              return "bg-red-900/80 text-red-200 border-red-700";
+            case "warning":
+              return "bg-amber-900/80 text-amber-200 border-amber-700";
+            default:
+              return "bg-blue-900/80 text-blue-200 border-blue-700";
+          }
+        };
+        return (
+          <div
+            class={`fixed top-2 right-2 z-50 rounded border px-3 py-1.5 text-xs shadow-lg transition-opacity ${colorClass()}`}
+          >
+            <span>{notification().text}</span>
+            <button
+              class="ml-2 opacity-60 hover:opacity-100"
+              onClick={() => setFileNotification(null)}
+            >
+              x
+            </button>
+          </div>
+        );
+      }}
+    </Show>
+  );
+
   // Preview content with reading-support features
   const PreviewContent = () => (
     <>
+      <FileNotification />
       <ReadingProgress
         progress={readingProgress.progress()}
         visible={readingProgress.isScrollable()}
@@ -523,6 +589,7 @@ const App: Component = () => {
         fallback={<FullContent />}
       >
         <PeekShell>
+          <FileNotification />
           <Switch fallback={<LoadingView />}>
             <Match when={viewMode() === "loading"}>
               <LoadingView />

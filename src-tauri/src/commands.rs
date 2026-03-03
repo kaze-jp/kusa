@@ -449,6 +449,27 @@ pub fn promote_to_full(window: tauri::Window) -> Result<(), String> {
     Ok(())
 }
 
+// --- File watcher commands ---
+
+/// Start watching a file for external changes.
+/// Emits `file-changed` and `file-deleted` Tauri events to the frontend.
+#[tauri::command]
+pub fn start_file_watch(
+    path: String,
+    app: tauri::AppHandle,
+    state: tauri::State<'_, crate::watcher::FileWatcherState>,
+) -> Result<(), String> {
+    state.start(app, path)
+}
+
+/// Stop the current file watch, if any.
+#[tauri::command]
+pub fn stop_file_watch(
+    state: tauri::State<'_, crate::watcher::FileWatcherState>,
+) -> Result<(), String> {
+    state.stop()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
