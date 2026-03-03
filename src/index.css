@@ -5,6 +5,9 @@
    ======================================== */
 
 :root {
+  /* Zoom (set dynamically by useZoom, default 16px = 100%) */
+  --zoom-font-size: 16px;
+
   /* Dark theme (default) */
   --color-bg: #0d1117;
   --color-bg-secondary: #161b22;
@@ -354,7 +357,7 @@ body {
 .markdown-body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans",
     Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-  font-size: 16px;
+  font-size: var(--zoom-font-size);
   line-height: 1.6;
   color: var(--color-text);
   word-wrap: break-word;
@@ -715,6 +718,7 @@ body {
 
 .cm-editor {
   height: 100%;
+  font-size: var(--zoom-font-size);
 }
 .cm-editor .cm-scroller {
   overflow: auto;
