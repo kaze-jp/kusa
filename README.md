@@ -18,8 +18,14 @@ brew install gene/tap/kusa
 2. Open the `.dmg` and drag `kusa.app` to `/Applications`
 3. Symlink the CLI binary to your PATH:
    ```sh
+   # Option A: /usr/local/bin (may require sudo)
    ln -sf /Applications/kusa.app/Contents/MacOS/kusa /usr/local/bin/kusa
+
+   # Option B: ~/.local/bin (user-writable, no sudo needed)
+   mkdir -p ~/.local/bin
+   ln -sf /Applications/kusa.app/Contents/MacOS/kusa ~/.local/bin/kusa
    ```
+   Make sure the chosen directory is in your `PATH`.
 
 ### Build from source
 
