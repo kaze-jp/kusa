@@ -67,6 +67,17 @@
         "mimeType": "text/markdown",
         "role": "Viewer"
       }
-    ]
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "dmg": {
+        "appPosition": { "x": 180, "y": 170 },
+        "applicationFolderPosition": { "x": 480, "y": 170 },
+        "windowSize": { "width": 660, "height": 400 }
+      }
+    },
+    "category": "DeveloperTool",
+    "shortDescription": "Markdown editor for AI developers",
+    "longDescription": "A lightweight, fast Markdown editor and viewer designed for AI developers who work from the terminal."
   }
 }
