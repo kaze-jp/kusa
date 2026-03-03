@@ -36,6 +36,7 @@ pub fn run() {
             commands::read_stdin,
             commands::read_clipboard,
             commands::fetch_url,
+            commands::write_file,
         ])
         .plugin(
             tauri_plugin_single_instance::init(|app, args, _cwd| {
