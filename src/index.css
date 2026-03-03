@@ -1,6 +1,18 @@
 @import "tailwindcss";
 
 /* ========================================
+   Utility: hide scrollbar (tab bar overflow)
+   ======================================== */
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* ========================================
    Theme System (CSS Custom Properties)
    ======================================== */
 
