@@ -1,0 +1,178 @@
+import { createSignal, onCleanup } from "solid-js";
+import type { HeadingInfo } from "./markdown";
+
+const SEQUENCE_TIMEOUT = 500;
+
+export interface VimNavActions {
+  /** Jump to a specific heading by ID */
+  jumpToHeading: (id: string) => void;
+  /** Scroll to the top of the document */
+  scrollToTop: () => void;
+  /** Scroll to the bottom of the document */
+  scrollToBottom: () => void;
+  /** Jump to the next heading from current position */
+  jumpToNextHeading: () => void;
+  /** Jump to the previous heading from current position */
+  jumpToPrevHeading: () => void;
+  /** Open the heading picker */
+  openPicker: () => void;
+}
+
+/**
+ * Vim-style keyboard navigation for heading jumps.
+ *
+ * Supported sequences:
+ * - `gd` -> Open heading picker
+ * - `gg` -> Scroll to top
+ * - `G`  -> Scroll to bottom
+ * - `]]` -> Jump to next heading
+ * - `[[` -> Jump to previous heading
+ */
+export function useVimNav(
+  getContainer: () => HTMLElement | undefined,
+  getHeadings: () => HeadingInfo[],
+  getActiveId: () => string | null
+) {
+  const [pickerOpen, setPickerOpen] = createSignal(false);
+  let pendingKey: string | null = null;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  function resetSequence() {
+    pendingKey = null;
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+  }
+
+  function startTimeout() {
+    timeoutId = setTimeout(resetSequence, SEQUENCE_TIMEOUT);
+  }
+
+  function findHeadingElement(container: HTMLElement, id: string): HTMLElement | null {
+    return container.querySelector(`#${CSS.escape(id)}`);
+  }
+
+  function scrollToHeading(id: string) {
+    const container = getContainer();
+    if (!container) return;
+    const el = findHeadingElement(container, id);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+
+  function scrollToTop() {
+    const container = getContainer();
+    if (container) {
+      container.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }
+
+  function scrollToBottom() {
+    const container = getContainer();
+    if (container) {
+      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+    }
+  }
+
+  function jumpToNextHeading() {
+    const headings = getHeadings();
+    const activeId = getActiveId();
+    if (headings.length === 0) return;
+
+    const currentIndex = headings.findIndex((h) => h.id === activeId);
+    const nextIndex = currentIndex < headings.length - 1 ? currentIndex + 1 : currentIndex;
+    scrollToHeading(headings[nextIndex].id);
+  }
+
+  function jumpToPrevHeading() {
+    const headings = getHeadings();
+    const activeId = getActiveId();
+    if (headings.length === 0) return;
+
+    const currentIndex = headings.findIndex((h) => h.id === activeId);
+    const prevIndex = currentIndex > 0 ? currentIndex - 1 : 0;
+    scrollToHeading(headings[prevIndex].id);
+  }
+
+  function handleKeyDown(e: KeyboardEvent) {
+    // Don't handle keys when input elements are focused
+    const target = e.target as HTMLElement;
+    if (
+      target.tagName === "INPUT" ||
+      target.tagName === "TEXTAREA" ||
+      target.isContentEditable
+    ) {
+      return;
+    }
+
+    // Don't handle when picker is open (it has its own handler)
+    if (pickerOpen()) return;
+
+    const key = e.key;
+
+    // Single-key: G -> scroll to bottom
+    if (key === "G" && !pendingKey) {
+      e.preventDefault();
+      scrollToBottom();
+      resetSequence();
+      return;
+    }
+
+    // Two-key sequences
+    if (pendingKey) {
+      const sequence = pendingKey + key;
+      resetSequence();
+
+      switch (sequence) {
+        case "gg":
+          e.preventDefault();
+          scrollToTop();
+          return;
+        case "gd":
+          e.preventDefault();
+          setPickerOpen(true);
+          return;
+        case "]]":
+          e.preventDefault();
+          jumpToNextHeading();
+          return;
+        case "[[":
+          e.preventDefault();
+          jumpToPrevHeading();
+          return;
+      }
+      // Unknown sequence, ignore
+      return;
+    }
+
+    // Start of potential sequence
+    if (key === "g" || key === "]" || key === "[") {
+      pendingKey = key;
+      startTimeout();
+      return;
+    }
+  }
+
+  // Register global key listener
+  document.addEventListener("keydown", handleKeyDown);
+
+  onCleanup(() => {
+    document.removeEventListener("keydown", handleKeyDown);
+    resetSequence();
+  });
+
+  return {
+    pickerOpen,
+    setPickerOpen,
+    actions: {
+      jumpToHeading: scrollToHeading,
+      scrollToTop,
+      scrollToBottom,
+      jumpToNextHeading,
+      jumpToPrevHeading,
+      openPicker: () => setPickerOpen(true),
+    } satisfies VimNavActions,
+  };
+}

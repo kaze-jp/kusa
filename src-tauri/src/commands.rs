@@ -1,5 +1,6 @@
 use base64::Engine;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
@@ -347,6 +348,68 @@ pub fn write_file(path: String, content: String) -> Result<WriteFileResult, Stri
     })
 }
 
+// --- Preference persistence (reading-support) ---
+
+/// Get the preferences file path: ~/.config/kusa/preferences.json
+fn preferences_path() -> PathBuf {
+    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+    home.join(".config").join("kusa").join("preferences.json")
+}
+
+/// Read the current preferences map from disk.
+fn read_preferences() -> HashMap<String, String> {
+    let path = preferences_path();
+    match fs::read_to_string(&path) {
+        Ok(content) => serde_json::from_str(&content).unwrap_or_default(),
+        Err(_) => HashMap::new(),
+    }
+}
+
+/// Write the preferences map to disk, creating directories as needed.
+fn write_preferences(prefs: &HashMap<String, String>) -> Result<(), String> {
+    let path = preferences_path();
+
+    // Ensure parent directory exists
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Cannot create config directory: {}", e))?;
+    }
+
+    let json = serde_json::to_string_pretty(prefs)
+        .map_err(|e| format!("Cannot serialize preferences: {}", e))?;
+
+    fs::write(&path, json)
+        .map_err(|e| format!("Cannot write preferences file: {}", e))?;
+
+    Ok(())
+}
+
+/// Validate preference key to prevent path traversal or injection.
+fn validate_key(key: &str) -> Result<(), String> {
+    if key.is_empty() || key.len() > 64 {
+        return Err("Invalid preference key length".to_string());
+    }
+    if key.contains('/') || key.contains('\\') || key.contains("..") {
+        return Err("Invalid characters in preference key".to_string());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn save_preference(key: String, value: String) -> Result<(), String> {
+    validate_key(&key)?;
+    let mut prefs = read_preferences();
+    prefs.insert(key, value);
+    write_preferences(&prefs)
+}
+
+#[tauri::command]
+pub fn load_preference(key: String) -> Result<Option<String>, String> {
+    validate_key(&key)?;
+    let prefs = read_preferences();
+    Ok(prefs.get(&key).cloned())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -577,5 +640,32 @@ mod tests {
         // Ensure no .tmp.kusa file remains
         let temp_path = file_path.with_extension("tmp.kusa");
         assert!(!temp_path.exists());
+    }
+
+    // --- Preference tests ---
+
+    #[test]
+    fn test_validate_key_valid() {
+        assert!(validate_key("theme").is_ok());
+        assert!(validate_key("font-size").is_ok());
+        assert!(validate_key("editor_mode").is_ok());
+    }
+
+    #[test]
+    fn test_validate_key_empty() {
+        assert!(validate_key("").is_err());
+    }
+
+    #[test]
+    fn test_validate_key_path_traversal() {
+        assert!(validate_key("../etc/passwd").is_err());
+        assert!(validate_key("foo/bar").is_err());
+        assert!(validate_key("foo\\bar").is_err());
+    }
+
+    #[test]
+    fn test_validate_key_too_long() {
+        let long_key = "a".repeat(65);
+        assert!(validate_key(&long_key).is_err());
     }
 }

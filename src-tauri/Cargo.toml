@@ -24,6 +24,7 @@ is-terminal = "0.4"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 base64 = "0.22"
 tokio = { version = "1", features = ["rt"] }
+dirs = "6"
 
 [dev-dependencies]
 tempfile = "3"
