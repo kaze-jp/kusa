@@ -326,6 +326,18 @@ body {
 }
 
 /* ========================================
+   Preview Wrapper (positions search bar)
+   ======================================== */
+
+.preview-wrapper {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ========================================
    Preview Container
    ======================================== */
 
@@ -722,4 +734,119 @@ body {
 }
 .cm-editor .cm-scroller {
   overflow: auto;
+}
+
+/* ========================================
+   Search Bar
+   ======================================== */
+
+.search-bar {
+  position: absolute;
+  top: 8px;
+  right: 16px;
+  z-index: 60;
+  pointer-events: auto;
+}
+
+.search-bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.search-bar-input {
+  width: 200px;
+  padding: 4px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.search-bar-input:focus {
+  border-color: var(--color-toc-active);
+  box-shadow: 0 0 0 2px rgba(31, 111, 235, 0.3);
+}
+
+.search-bar-input::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.search-bar-count {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  min-width: 36px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  user-select: none;
+  padding: 0 4px;
+}
+
+.search-bar-count-zero {
+  color: #f87171;
+}
+
+.search-bar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.search-bar-btn:hover:not(:disabled) {
+  background: var(--color-border);
+  color: var(--color-text);
+}
+
+.search-bar-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.search-bar-close:hover {
+  color: #f87171;
+}
+
+/* ========================================
+   Search Highlights
+   ======================================== */
+
+mark.search-highlight {
+  background-color: rgba(250, 204, 21, 0.35);
+  color: inherit;
+  padding: 0;
+  border-radius: 2px;
+}
+
+mark.search-highlight-current {
+  background-color: rgba(250, 204, 21, 0.7);
+  outline: 2px solid rgba(250, 204, 21, 0.8);
+  outline-offset: 0;
+}
+
+/* Light theme overrides */
+.light mark.search-highlight {
+  background-color: rgba(250, 204, 21, 0.4);
+}
+
+.light mark.search-highlight-current {
+  background-color: rgba(250, 204, 21, 0.7);
+  outline-color: rgba(202, 138, 4, 0.6);
 }
