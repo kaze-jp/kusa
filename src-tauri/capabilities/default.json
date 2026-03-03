@@ -1,0 +1,11 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicegram/nicegram-web/main/nicegram/nicegram-web/main/tauri/tauri/dev/crates/tauri-utils/schema.json",
+  "identifier": "default",
+  "description": "Default capabilities for kusa",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "cli:default",
+    "window-state:default"
+  ]
+}
