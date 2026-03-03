@@ -4,21 +4,20 @@ use std::path::PathBuf;
 use tauri::{Emitter, Manager, RunEvent};
 use tauri_plugin_cli::CliExt;
 
-fn resolve_and_emit(app: &tauri::App, raw_path: &str) {
+fn resolve_and_emit<R: tauri::Runtime, E: Emitter<R>>(emitter: &E, raw_path: &str) {
     let path = PathBuf::from(raw_path);
     let canonical = match std::fs::canonicalize(&path) {
         Ok(p) => p,
         Err(_) => {
-            // File doesn't exist, still emit as file (frontend will show error)
-            let _ = app.emit("cli-open", raw_path.to_string());
+            let _ = emitter.emit("cli-open", raw_path.to_string());
             return;
         }
     };
 
     if canonical.is_dir() {
-        let _ = app.emit("cli-open-dir", canonical.to_string_lossy().to_string());
+        let _ = emitter.emit("cli-open-dir", canonical.to_string_lossy().to_string());
     } else {
-        let _ = app.emit("cli-open", canonical.to_string_lossy().to_string());
+        let _ = emitter.emit("cli-open", canonical.to_string_lossy().to_string());
     }
 }
 
@@ -32,7 +31,7 @@ pub fn run() {
         .plugin(
             tauri_plugin_single_instance::init(|app, args, _cwd| {
                 if let Some(path) = args.get(1) {
-                    let _ = app.emit("open-file", path.clone());
+                    resolve_and_emit(app, path);
                 }
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.set_focus();

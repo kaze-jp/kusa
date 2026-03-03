@@ -39,17 +39,21 @@ const App: Component = () => {
   });
 
   const [chunkedHtml, setChunkedHtml] = createSignal<string | null>(null);
+  let chunkedGeneration = 0; // cancellation token for chunked rendering
 
   const [htmlContent] = createResource(
     () => fileContent(),
     async (content) => {
-      if (content == null) return "";
       setChunkedHtml(null);
+      if (content == null) return "";
       const path = currentFilePath();
       if (path && isMarkdownFile(path)) {
         if (isLargeFile(content)) {
+          const generation = ++chunkedGeneration;
           await processMarkdownChunked(content, (html) => {
-            setChunkedHtml(html);
+            if (generation === chunkedGeneration) {
+              setChunkedHtml(html);
+            }
           });
           return chunkedHtml() ?? "";
         }

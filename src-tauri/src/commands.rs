@@ -40,7 +40,7 @@ pub fn list_md_files(dir_path: String) -> Result<Vec<MdFileEntry>, String> {
         }
 
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-        if ext != "md" && ext != "markdown" {
+        if ext != "md" && ext != "markdown" && ext != "mdx" {
             continue;
         }
 
@@ -114,14 +114,16 @@ mod tests {
         let dir = TempDir::new().unwrap();
         fs::write(dir.path().join("readme.md"), "# Readme").unwrap();
         fs::write(dir.path().join("notes.markdown"), "# Notes").unwrap();
+        fs::write(dir.path().join("page.mdx"), "# Page").unwrap();
         fs::write(dir.path().join("code.rs"), "fn main() {}").unwrap();
 
         let result = list_md_files(dir.path().to_string_lossy().to_string());
         assert!(result.is_ok());
         let files = result.unwrap();
-        assert_eq!(files.len(), 2);
+        assert_eq!(files.len(), 3);
         assert!(files.iter().any(|f| f.name == "readme.md"));
         assert!(files.iter().any(|f| f.name == "notes.markdown"));
+        assert!(files.iter().any(|f| f.name == "page.mdx"));
     }
 
     #[test]
