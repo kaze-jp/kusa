@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { processMarkdown, isMarkdownFile } from "./markdown";
+import { processMarkdown, isMarkdownFile, extractHeadings } from "./markdown";
 
 describe("processMarkdown", () => {
-  it("renders headings", async () => {
+  it("renders headings with id attributes", async () => {
     const html = await processMarkdown("# Hello\n## World");
-    expect(html).toContain("<h1>Hello</h1>");
-    expect(html).toContain("<h2>World</h2>");
+    expect(html).toContain('<h1 id="hello">Hello</h1>');
+    expect(html).toContain('<h2 id="world">World</h2>');
   });
 
   it("renders paragraphs", async () => {
@@ -132,6 +132,94 @@ describe("processMarkdown", () => {
     const html = await processMarkdown("[ext](https://example.com)");
     expect(html).toContain('target="_blank"');
     expect(html).toContain('rel="noopener noreferrer"');
+  });
+
+  // rehype-slug integration
+  it("adds id attributes to headings via rehype-slug", async () => {
+    const html = await processMarkdown("# Getting Started\n## Installation Guide");
+    expect(html).toContain('id="getting-started"');
+    expect(html).toContain('id="installation-guide"');
+  });
+
+  it("handles duplicate heading IDs", async () => {
+    const html = await processMarkdown("# Foo\n## Foo\n### Foo");
+    expect(html).toContain('id="foo"');
+    expect(html).toContain('id="foo-1"');
+    expect(html).toContain('id="foo-2"');
+  });
+});
+
+describe("extractHeadings", () => {
+  it("extracts h1-h6 headings", () => {
+    const md = "# H1\n## H2\n### H3\n#### H4\n##### H5\n###### H6";
+    const headings = extractHeadings(md);
+    expect(headings).toHaveLength(6);
+    expect(headings[0]).toEqual({ id: "h1", text: "H1", level: 1, index: 0 });
+    expect(headings[1]).toEqual({ id: "h2", text: "H2", level: 2, index: 1 });
+    expect(headings[2]).toEqual({ id: "h3", text: "H3", level: 3, index: 2 });
+    expect(headings[3]).toEqual({ id: "h4", text: "H4", level: 4, index: 3 });
+    expect(headings[4]).toEqual({ id: "h5", text: "H5", level: 5, index: 4 });
+    expect(headings[5]).toEqual({ id: "h6", text: "H6", level: 6, index: 5 });
+  });
+
+  it("returns empty array for document with no headings", () => {
+    const md = "Just a paragraph\n\nAnother one.";
+    const headings = extractHeadings(md);
+    expect(headings).toHaveLength(0);
+  });
+
+  it("returns empty array for empty string", () => {
+    expect(extractHeadings("")).toHaveLength(0);
+  });
+
+  it("extracts text from headings with inline formatting", () => {
+    const md = "# **Bold** heading\n## *Italic* heading\n### `Code` heading";
+    const headings = extractHeadings(md);
+    expect(headings[0].text).toBe("Bold heading");
+    expect(headings[1].text).toBe("Italic heading");
+    expect(headings[2].text).toBe("Code heading");
+  });
+
+  it("extracts text from headings with links", () => {
+    const md = "# [Linked](https://example.com) heading";
+    const headings = extractHeadings(md);
+    expect(headings[0].text).toBe("Linked heading");
+  });
+
+  it("handles duplicate heading texts with incremented IDs", () => {
+    const md = "# Setup\n## Setup\n## Setup";
+    const headings = extractHeadings(md);
+    expect(headings[0].id).toBe("setup");
+    expect(headings[1].id).toBe("setup-1");
+    expect(headings[2].id).toBe("setup-2");
+  });
+
+  it("generates slugs with hyphens for spaces", () => {
+    const md = "# Getting Started Guide";
+    const headings = extractHeadings(md);
+    expect(headings[0].id).toBe("getting-started-guide");
+  });
+
+  it("handles special characters in headings", () => {
+    const md = "# What's New?\n## C++ Guide";
+    const headings = extractHeadings(md);
+    expect(headings[0].id).toBe("whats-new");
+    expect(headings[1].id).toBe("c-guide");
+  });
+
+  it("handles Japanese headings", () => {
+    const md = "# はじめに\n## インストール";
+    const headings = extractHeadings(md);
+    expect(headings[0].id).toBe("はじめに");
+    expect(headings[1].id).toBe("インストール");
+  });
+
+  it("preserves document order via index", () => {
+    const md = "# First\nSome text\n## Second\nMore text\n### Third";
+    const headings = extractHeadings(md);
+    expect(headings[0].index).toBe(0);
+    expect(headings[1].index).toBe(1);
+    expect(headings[2].index).toBe(2);
   });
 });
 
