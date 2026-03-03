@@ -38,11 +38,14 @@ describe("processMarkdown", () => {
     expect(html).toContain('alt="alt"');
   });
 
-  it("renders code blocks with language class", async () => {
+  it("renders code blocks with syntax highlighting", async () => {
     const html = await processMarkdown("```js\nconsole.log('hi')\n```");
-    expect(html).toContain("<pre>");
+    expect(html).toContain("<pre");
     expect(html).toContain("<code");
-    expect(html).toContain("console.log");
+    expect(html).toContain("console.");
+    expect(html).toContain("log");
+    // rehype-pretty-code wraps tokens in styled spans
+    expect(html).toContain("style=");
   });
 
   it("renders inline code", async () => {
@@ -88,6 +91,47 @@ describe("processMarkdown", () => {
   it("strips onclick handlers", async () => {
     const html = await processMarkdown('<div onclick="alert(1)">test</div>');
     expect(html).not.toContain("onclick");
+  });
+
+  // Syntax highlighting
+  it("applies syntax highlighting to code blocks", async () => {
+    const html = await processMarkdown("```js\nconst x = 1;\n```");
+    expect(html).toContain("<pre");
+    expect(html).toContain("<code");
+    expect(html).toContain("const");
+  });
+
+  it("highlights TypeScript code", async () => {
+    const html = await processMarkdown(
+      "```ts\ninterface User { name: string; }\n```",
+    );
+    expect(html).toContain("<pre");
+    expect(html).toContain("interface");
+  });
+
+  it("highlights Rust code", async () => {
+    const html = await processMarkdown("```rust\nfn main() {}\n```");
+    expect(html).toContain("<pre");
+    expect(html).toContain("main");
+  });
+
+  it("highlights Python code", async () => {
+    const html = await processMarkdown("```python\ndef hello():\n    pass\n```");
+    expect(html).toContain("<pre");
+    expect(html).toContain("hello");
+  });
+
+  it("handles code blocks without language", async () => {
+    const html = await processMarkdown("```\nplain code\n```");
+    expect(html).toContain("<pre");
+    expect(html).toContain("plain code");
+  });
+
+  // External links
+  it("adds target and rel to external links", async () => {
+    const html = await processMarkdown("[ext](https://example.com)");
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('rel="noopener noreferrer"');
   });
 });
 
