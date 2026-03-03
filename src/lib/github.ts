@@ -6,6 +6,13 @@ export interface GitHubTarget {
   branch?: string;
   apiUrl: string;
   displayTitle: string;
+  /**
+   * For blob/tree URLs, the raw segments after blob/tree joined as a path.
+   * Useful for fallback: if the initial API call with the inferred branch
+   * fails (e.g., 404 due to slash-containing branch name), the caller can
+   * retry with the full rawPathWithRef as the path without a ref parameter.
+   */
+  rawPathWithRef?: string;
 }
 
 /**
@@ -82,10 +89,45 @@ export function parseGitHubShorthand(input: string): GitHubTarget | null {
 }
 
 /**
+ * Infer where the branch name ends and the file path begins
+ * in the segments after "blob/" or "tree/" in a GitHub URL.
+ *
+ * GitHub branch names can contain slashes (e.g., "feature/x"),
+ * making URL parsing ambiguous without an API call. We use a
+ * best-effort heuristic: treat the first segment as the branch
+ * name and everything else as the file path. This works for the
+ * most common branch names (main, master, develop, v1.0, etc.).
+ *
+ * For slash-containing branches, callers should fall back to the
+ * GitHub API with the full remaining path if the initial ref fails.
+ *
+ * Returns { branch, filePath }.
+ */
+function inferBranchAndPath(segments: string[]): {
+  branch: string;
+  filePath: string;
+} {
+  if (segments.length === 0) {
+    return { branch: "", filePath: "" };
+  }
+  if (segments.length === 1) {
+    return { branch: segments[0], filePath: "README.md" };
+  }
+
+  // Default: first segment is the branch, rest is the file path.
+  // This handles the most common case (main, master, develop, etc.)
+  return {
+    branch: segments[0],
+    filePath: segments.slice(1).join("/"),
+  };
+}
+
+/**
  * Parse a GitHub web URL into a GitHubTarget.
  *
  * Supported formats:
  *   https://github.com/owner/repo/blob/branch/path/to/file.md
+ *   https://github.com/owner/repo/blob/feature/x/docs/readme.md (slash in branch)
  *   https://github.com/owner/repo (-> README.md)
  *
  * Returns null if the URL is not a valid GitHub URL.
@@ -122,14 +164,16 @@ export function parseGitHubUrl(url: string): GitHubTarget | null {
       };
     }
 
-    // https://github.com/owner/repo/blob/branch/path...
+    // https://github.com/owner/repo/blob/<branch>/<path>...
     if (
       pathParts.length >= 4 &&
       (pathParts[2] === "blob" || pathParts[2] === "tree")
     ) {
-      const branch = pathParts[3];
-      const filePath =
-        pathParts.length > 4 ? pathParts.slice(4).join("/") : "README.md";
+      // Everything after blob/tree is branch + file path, which may be ambiguous
+      // when the branch name contains slashes (e.g., "feature/x").
+      const afterBlobOrTree = pathParts.slice(3);
+      const rawPathWithRef = afterBlobOrTree.join("/");
+      const { branch, filePath } = inferBranchAndPath(afterBlobOrTree);
 
       const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}?ref=${branch}`;
       return {
@@ -139,6 +183,7 @@ export function parseGitHubUrl(url: string): GitHubTarget | null {
         branch,
         apiUrl,
         displayTitle: `gh:${owner}/${repo}/${filePath}`,
+        rawPathWithRef,
       };
     }
 

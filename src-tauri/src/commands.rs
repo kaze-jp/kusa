@@ -226,7 +226,11 @@ pub async fn fetch_url(
         }
 
         if status.as_u16() == 404 {
-            return Err("リポジトリまたはファイルが見つかりません".to_string());
+            return Err(if is_github_api {
+                "リポジトリまたはファイルが見つかりません".to_string()
+            } else {
+                format!("ページが見つかりません (404): {}", url)
+            });
         }
 
         return Err(format!("HTTP エラー {}: {}", status.as_u16(), status.canonical_reason().unwrap_or("Unknown")));
@@ -320,7 +324,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         fs::write(dir.path().join("readme.md"), "# Readme").unwrap();
         fs::write(dir.path().join("notes.markdown"), "# Notes").unwrap();
-        fs::write(dir.path().join("page.mdx"), "# Page").unwrap();
+        fs::write(dir.path().join("page.mdx"), "export default MDXPage").unwrap();
         fs::write(dir.path().join("code.rs"), "fn main() {}").unwrap();
 
         let result = list_md_files(dir.path().to_string_lossy().to_string());

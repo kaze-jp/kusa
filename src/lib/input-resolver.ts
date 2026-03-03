@@ -67,11 +67,25 @@ export async function resolveInputSource(
           "GitHub URL の形式が不正です。対応形式: https://github.com/owner/repo/blob/branch/path",
         );
       }
-      return await invoke<InputContent>("fetch_url", {
-        url: target.apiUrl,
-        isGithubApi: true,
-        title: target.displayTitle,
-      });
+      try {
+        return await invoke<InputContent>("fetch_url", {
+          url: target.apiUrl,
+          isGithubApi: true,
+          title: target.displayTitle,
+        });
+      } catch (err) {
+        // If the initial request fails and we have a rawPathWithRef,
+        // retry with the full path (handles slash-containing branch names).
+        if (target.rawPathWithRef && target.rawPathWithRef !== target.path) {
+          const fallbackUrl = `https://api.github.com/repos/${target.owner}/${target.repo}/contents/${target.rawPathWithRef}`;
+          return await invoke<InputContent>("fetch_url", {
+            url: fallbackUrl,
+            isGithubApi: true,
+            title: target.displayTitle,
+          });
+        }
+        throw err;
+      }
     }
 
     // 5. Generic URL

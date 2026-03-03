@@ -155,4 +155,50 @@ describe("parseGitHubUrl", () => {
       parseGitHubUrl("https://github.com/owner/repo/pull/456"),
     ).toBeNull();
   });
+
+  it("provides rawPathWithRef for slash-containing branch fallback", () => {
+    const result = parseGitHubUrl(
+      "https://github.com/org/repo/blob/feature/x/docs/readme.md",
+    );
+    expect(result).not.toBeNull();
+    expect(result!.owner).toBe("org");
+    expect(result!.repo).toBe("repo");
+    // Heuristic: first segment as branch, rest as path
+    expect(result!.branch).toBe("feature");
+    expect(result!.path).toBe("x/docs/readme.md");
+    // rawPathWithRef preserves the full ambiguous path for fallback
+    expect(result!.rawPathWithRef).toBe("feature/x/docs/readme.md");
+    expect(result!.apiUrl).toBe(
+      "https://api.github.com/repos/org/repo/contents/x/docs/readme.md?ref=feature",
+    );
+  });
+
+  it("provides rawPathWithRef for deeply nested paths", () => {
+    const result = parseGitHubUrl(
+      "https://github.com/org/repo/blob/release/v2.0/src/lib/utils.ts",
+    );
+    expect(result).not.toBeNull();
+    expect(result!.branch).toBe("release");
+    expect(result!.path).toBe("v2.0/src/lib/utils.ts");
+    expect(result!.rawPathWithRef).toBe("release/v2.0/src/lib/utils.ts");
+  });
+
+  it("parses branch-only URL (no file) defaults to README.md", () => {
+    const result = parseGitHubUrl(
+      "https://github.com/org/repo/blob/main",
+    );
+    expect(result).not.toBeNull();
+    expect(result!.branch).toBe("main");
+    expect(result!.path).toBe("README.md");
+  });
+
+  it("parses simple branch with nested file path", () => {
+    const result = parseGitHubUrl(
+      "https://github.com/owner/repo/blob/main/src/components/App.tsx",
+    );
+    expect(result).not.toBeNull();
+    expect(result!.branch).toBe("main");
+    expect(result!.path).toBe("src/components/App.tsx");
+    expect(result!.rawPathWithRef).toBe("main/src/components/App.tsx");
+  });
 });
