@@ -5,6 +5,10 @@ use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 use std::time::UNIX_EPOCH;
+use tauri::LogicalSize;
+
+use crate::window_presets::FULL_SIZE;
+use crate::WindowModeState;
 
 /// Shared type for all input sources (file, stdin, clipboard, github, url)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -412,6 +416,39 @@ pub fn load_preference(key: String) -> Result<Option<String>, String> {
     validate_key(&key)?;
     let prefs = read_preferences();
     Ok(prefs.get(&key).cloned())
+}
+
+// --- New commands for lightweight-access ---
+
+/// Return the current window mode ("peek" or "full").
+/// This allows the frontend to query the mode reliably instead of
+/// depending on a race-prone event that may arrive before the WebView is ready.
+#[tauri::command]
+pub fn get_window_mode(state: tauri::State<'_, WindowModeState>) -> String {
+    state
+        .0
+        .lock()
+        .map(|s| s.clone())
+        .unwrap_or_else(|_| "full".to_string())
+}
+
+/// Promote a peek window to full window mode.
+/// Changes decorations, always-on-top, size, and centers the window.
+#[tauri::command]
+pub fn promote_to_full(window: tauri::Window) -> Result<(), String> {
+    window
+        .set_decorations(true)
+        .map_err(|e| format!("Failed to set decorations: {}", e))?;
+    window
+        .set_always_on_top(false)
+        .map_err(|e| format!("Failed to set always_on_top: {}", e))?;
+    window
+        .set_size(LogicalSize::new(FULL_SIZE.width, FULL_SIZE.height))
+        .map_err(|e| format!("Failed to set size: {}", e))?;
+    window
+        .center()
+        .map_err(|e| format!("Failed to center window: {}", e))?;
+    Ok(())
 }
 
 #[cfg(test)]

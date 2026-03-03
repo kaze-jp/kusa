@@ -10,17 +10,7 @@
     "beforeBuildCommand": "pnpm build"
   },
   "app": {
-    "windows": [
-      {
-        "title": "kusa",
-        "width": 900,
-        "height": 700,
-        "minWidth": 400,
-        "minHeight": 300,
-        "visible": false,
-        "decorations": true
-      }
-    ]
+    "windows": []
   },
   "plugins": {
     "cli": {
@@ -35,6 +25,27 @@
           "short": "c",
           "takesValue": false,
           "description": "Read Markdown content from system clipboard"
+        },
+        {
+          "name": "peek",
+          "short": "p",
+          "description": "Open in peek mode (small overlay window)",
+          "takesValue": false
+        },
+        {
+          "name": "no-peek",
+          "description": "Force full window mode (override pipe default)",
+          "takesValue": false
+        },
+        {
+          "name": "no-focus",
+          "description": "Do not steal focus from current window",
+          "takesValue": false
+        },
+        {
+          "name": "size",
+          "description": "Window size preset: peek, full, half",
+          "takesValue": true
         }
       ]
     }
