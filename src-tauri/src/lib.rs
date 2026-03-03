@@ -69,7 +69,8 @@ pub fn run() {
             if let RunEvent::Opened { urls } = event {
                 for url in urls {
                     if let Ok(path) = url.to_file_path() {
-                        let _ = app.emit("open-file", path.to_string_lossy().to_string());
+                        let path_str = path.to_string_lossy().to_string();
+                        resolve_and_emit(app, &path_str);
                     }
                 }
             }

@@ -5,6 +5,7 @@ import {
   Switch,
   Match,
   onMount,
+  onCleanup,
 } from "solid-js";
 import type { Component } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
@@ -94,22 +95,30 @@ const App: Component = () => {
   onMount(async () => {
     initKeyboardHandler();
 
-    // Listen for CLI open events
-    await listen<string>("cli-open", (event) => {
-      openFile(event.payload);
+    const unlisteners: (() => void)[] = [];
+
+    unlisteners.push(
+      await listen<string>("cli-open", (event) => {
+        openFile(event.payload);
+      }),
+    );
+
+    unlisteners.push(
+      await listen<string>("open-file", (event) => {
+        openFile(event.payload);
+      }),
+    );
+
+    unlisteners.push(
+      await listen<string>("cli-open-dir", (event) => {
+        openDirectory(event.payload);
+      }),
+    );
+
+    onCleanup(() => {
+      unlisteners.forEach((unlisten) => unlisten());
     });
 
-    // Listen for open-file events (single instance, file association)
-    await listen<string>("open-file", (event) => {
-      openFile(event.payload);
-    });
-
-    // Listen for directory open events
-    await listen<string>("cli-open-dir", (event) => {
-      openDirectory(event.payload);
-    });
-
-    // Show window after setup
     const appWindow = getCurrentWebviewWindow();
     await appWindow.show();
   });
