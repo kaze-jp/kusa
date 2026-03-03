@@ -192,7 +192,9 @@ body {
 }
 
 .toc-item {
-  padding: 4px 16px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-right: 16px;
   cursor: pointer;
   font-size: 13px;
   line-height: 1.4;

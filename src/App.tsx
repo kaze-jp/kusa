@@ -4,8 +4,10 @@ import {
   createEffect,
   createMemo,
   onCleanup,
+  onMount,
   Show,
 } from "solid-js";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { processMarkdown, extractHeadings } from "./lib/markdown";
 import { useActiveHeading } from "./lib/useActiveHeading";
 import { useReadingProgress } from "./lib/useReadingProgress";
@@ -183,6 +185,11 @@ const App: Component = () => {
     headings,
     activeId
   );
+
+  // Show window once the frontend is ready
+  onMount(() => {
+    getCurrentWindow().show();
+  });
 
   // Process markdown to HTML
   createEffect(async () => {

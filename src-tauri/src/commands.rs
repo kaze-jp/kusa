@@ -60,7 +60,11 @@ pub fn list_md_files(dir_path: String) -> Result<Vec<MdFileEntry>, String> {
             continue;
         }
 
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
         if ext != "md" && ext != "markdown" && ext != "mdx" {
             continue;
         }
@@ -450,7 +454,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         fs::write(dir.path().join("readme.md"), "# Readme").unwrap();
         fs::write(dir.path().join("notes.markdown"), "# Notes").unwrap();
-        fs::write(dir.path().join("page.mdx"), "export default MDXPage").unwrap();
+        fs::write(dir.path().join("component.mdx"), "# MDX").unwrap();
         fs::write(dir.path().join("code.rs"), "fn main() {}").unwrap();
 
         let result = list_md_files(dir.path().to_string_lossy().to_string());
@@ -459,7 +463,23 @@ mod tests {
         assert_eq!(files.len(), 3);
         assert!(files.iter().any(|f| f.name == "readme.md"));
         assert!(files.iter().any(|f| f.name == "notes.markdown"));
-        assert!(files.iter().any(|f| f.name == "page.mdx"));
+        assert!(files.iter().any(|f| f.name == "component.mdx"));
+    }
+
+    #[test]
+    fn test_list_md_files_case_insensitive() {
+        let dir = TempDir::new().unwrap();
+        fs::write(dir.path().join("README.MD"), "# Upper").unwrap();
+        fs::write(dir.path().join("CHANGELOG.Md"), "# Mixed").unwrap();
+        fs::write(dir.path().join("docs.MDX"), "# MDX Upper").unwrap();
+
+        let result = list_md_files(dir.path().to_string_lossy().to_string());
+        assert!(result.is_ok());
+        let files = result.unwrap();
+        assert_eq!(files.len(), 3);
+        assert!(files.iter().any(|f| f.name == "README.MD"));
+        assert!(files.iter().any(|f| f.name == "CHANGELOG.Md"));
+        assert!(files.iter().any(|f| f.name == "docs.MDX"));
     }
 
     #[test]
