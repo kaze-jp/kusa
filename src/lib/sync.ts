@@ -17,6 +17,7 @@ export interface SyncEngineConfig {
   previewDebounceMs: number; // 200-300ms recommended
   autoSaveDebounceMs: number; // 500-1000ms recommended
   filePath: string;
+  initialContent?: string; // seed buffer so :w before any edit won't blank the file
   onPreviewUpdate: (html: string) => void;
   onSaveComplete: () => void;
   onSaveError: (error: string) => void;
@@ -94,7 +95,7 @@ function debounce<T extends (...args: any[]) => void>(
 
 export function createSyncEngine(config: SyncEngineConfig): SyncEngineInstance {
   let lastGoodHtml = "";
-  let currentContent = "";
+  let currentContent = config.initialContent ?? "";
   let isDirty = false;
   let saving = false;
   let pendingSave = false;

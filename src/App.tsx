@@ -75,6 +75,7 @@ const App: Component = () => {
       const content = await invoke<string>("read_file", { path });
       setFilePath(path);
       setRawContent(content);
+      setNoFile(false);
       setLoading(false);
     } catch (e: any) {
       console.error("Failed to load file:", e);
@@ -89,6 +90,7 @@ const App: Component = () => {
       previewDebounceMs: 250,
       autoSaveDebounceMs: 800,
       filePath: path,
+      initialContent: rawContent(),
       onPreviewUpdate: (html) => setPreviewHtml(html),
       onSaveComplete: () => {
         setIsDirty(false);

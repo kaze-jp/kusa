@@ -26,7 +26,7 @@ export default function Preview(props: PreviewProps) {
   createEffect(() => {
     if (props.htmlContent) {
       const content = props.htmlContent();
-      if (content) {
+      if (content != null) {
         setHtml(content);
         setLoading(false);
       }
