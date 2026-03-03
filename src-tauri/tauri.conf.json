@@ -29,6 +29,12 @@
           "name": "file",
           "index": 1,
           "takesValue": true
+        },
+        {
+          "name": "clipboard",
+          "short": "c",
+          "takesValue": false,
+          "description": "Read Markdown content from system clipboard"
         }
       ]
     }

@@ -6,6 +6,7 @@
   "permissions": [
     "core:default",
     "cli:default",
-    "window-state:default"
+    "window-state:default",
+    "clipboard-manager:allow-read-text"
   ]
 }
