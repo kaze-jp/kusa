@@ -5,6 +5,9 @@ use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 use std::time::UNIX_EPOCH;
+use tauri::LogicalSize;
+
+use crate::window_presets::FULL_SIZE;
 
 /// Shared type for all input sources (file, stdin, clipboard, github, url)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -412,6 +415,27 @@ pub fn load_preference(key: String) -> Result<Option<String>, String> {
     validate_key(&key)?;
     let prefs = read_preferences();
     Ok(prefs.get(&key).cloned())
+}
+
+// --- New commands for lightweight-access ---
+
+/// Promote a peek window to full window mode.
+/// Changes decorations, always-on-top, size, and centers the window.
+#[tauri::command]
+pub fn promote_to_full(window: tauri::Window) -> Result<(), String> {
+    window
+        .set_decorations(true)
+        .map_err(|e| format!("Failed to set decorations: {}", e))?;
+    window
+        .set_always_on_top(false)
+        .map_err(|e| format!("Failed to set always_on_top: {}", e))?;
+    window
+        .set_size(LogicalSize::new(FULL_SIZE.width, FULL_SIZE.height))
+        .map_err(|e| format!("Failed to set size: {}", e))?;
+    window
+        .center()
+        .map_err(|e| format!("Failed to center window: {}", e))?;
+    Ok(())
 }
 
 #[cfg(test)]

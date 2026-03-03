@@ -7,6 +7,7 @@ import {
   onMount,
   Show,
 } from "solid-js";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { processMarkdown, extractHeadings } from "./lib/markdown";
 import { useActiveHeading } from "./lib/useActiveHeading";
@@ -18,6 +19,12 @@ import Preview from "./components/Preview";
 import TOCPanel from "./components/TOCPanel";
 import HeadingPicker from "./components/HeadingPicker";
 import ReadingProgress from "./components/ReadingProgress";
+import PeekShell from "./components/PeekShell";
+import {
+  initWindowMode,
+  isPeekMode,
+  type WindowMode,
+} from "./stores/windowMode";
 
 // Demo content for development
 const DEMO_MARKDOWN = `# kusa — Markdown Reader
@@ -163,6 +170,9 @@ kusa aims to be the definitive Markdown reading experience for terminal-native A
 `;
 
 const App: Component = () => {
+  // Window mode initialization
+  const [modeReady, setModeReady] = createSignal(false);
+
   // Core state
   const [markdown, setMarkdown] = createSignal(DEMO_MARKDOWN);
   const [html, setHtml] = createSignal("");
@@ -186,8 +196,24 @@ const App: Component = () => {
     activeId
   );
 
-  // Show window once the frontend is ready
-  onMount(() => {
+  // Initialize window mode from Rust backend event, then show window
+  onMount(async () => {
+    // Listen for window mode from Rust backend
+    await listen<string>("window-mode", (event) => {
+      const mode = event.payload as WindowMode;
+      initWindowMode(mode);
+      setModeReady(true);
+    });
+
+    // If no event received within 100ms, default to full mode
+    setTimeout(() => {
+      if (!modeReady()) {
+        initWindowMode("full");
+        setModeReady(true);
+      }
+    }, 100);
+
+    // Show window once the frontend is ready
     getCurrentWindow().show();
   });
 
@@ -259,7 +285,8 @@ const App: Component = () => {
     actions.jumpToHeading(id);
   }
 
-  return (
+  // Full mode content (reading-support features: TOC, vim nav, focus mode, etc.)
+  const FullContent = () => (
     <>
       <ReadingProgress
         progress={readingProgress.progress()}
@@ -284,6 +311,22 @@ const App: Component = () => {
         onClose={() => setPickerOpen(false)}
       />
     </>
+  );
+
+  return (
+    <Show when={modeReady()} fallback={<div class="h-full bg-zinc-900" />}>
+      <Show
+        when={isPeekMode()}
+        fallback={<FullContent />}
+      >
+        <PeekShell>
+          <Preview
+            html={html()}
+            ref={(el) => (previewRef = el)}
+          />
+        </PeekShell>
+      </Show>
+    </Show>
   );
 };
 
