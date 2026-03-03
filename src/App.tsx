@@ -15,6 +15,7 @@ import { useReadingProgress } from "./lib/useReadingProgress";
 import { useVimNav } from "./lib/useVimNav";
 import { useFocusMode } from "./lib/useFocusMode";
 import { useTheme } from "./lib/useTheme";
+import { useZoom } from "./lib/useZoom";
 import Preview from "./components/Preview";
 import TOCPanel from "./components/TOCPanel";
 import HeadingPicker from "./components/HeadingPicker";
@@ -187,6 +188,7 @@ const App: Component = () => {
 
   // Hooks
   const theme = useTheme();
+  const zoom = useZoom();
   const { activeId, observe } = useActiveHeading();
   const readingProgress = useReadingProgress();
   const focusMode = useFocusMode(getPreviewRef, activeId);
@@ -264,6 +266,27 @@ const App: Component = () => {
     if (e.ctrlKey && e.key === "f") {
       e.preventDefault();
       focusMode.toggle();
+      return;
+    }
+
+    // Cmd+= / Ctrl+=: Zoom in
+    if ((e.metaKey || e.ctrlKey) && (e.key === "=" || e.key === "+")) {
+      e.preventDefault();
+      zoom.zoomIn();
+      return;
+    }
+
+    // Cmd+- / Ctrl+-: Zoom out
+    if ((e.metaKey || e.ctrlKey) && e.key === "-") {
+      e.preventDefault();
+      zoom.zoomOut();
+      return;
+    }
+
+    // Cmd+0 / Ctrl+0: Reset zoom
+    if ((e.metaKey || e.ctrlKey) && e.key === "0") {
+      e.preventDefault();
+      zoom.resetZoom();
       return;
     }
   }
