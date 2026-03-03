@@ -1,0 +1,186 @@
+.prose {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  color: #e4e4e7; /* zinc-200 */
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+/* Headings */
+.prose h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-top: 0;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #3f3f46; /* zinc-700 */
+  color: #fafafa; /* zinc-50 */
+}
+
+.prose h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid #3f3f46;
+  color: #fafafa;
+}
+
+.prose h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: #fafafa;
+}
+
+.prose h4,
+.prose h5,
+.prose h6 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  color: #fafafa;
+}
+
+/* Paragraphs */
+.prose p {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+/* Links */
+.prose a {
+  color: #60a5fa; /* blue-400 */
+  text-decoration: none;
+}
+
+.prose a:hover {
+  text-decoration: underline;
+}
+
+/* Lists */
+.prose ul,
+.prose ol {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  padding-left: 1.5rem;
+}
+
+.prose ul {
+  list-style-type: disc;
+}
+
+.prose ol {
+  list-style-type: decimal;
+}
+
+.prose li {
+  margin-bottom: 0.25rem;
+}
+
+.prose li > ul,
+.prose li > ol {
+  margin-top: 0.25rem;
+  margin-bottom: 0;
+}
+
+/* Blockquotes */
+.prose blockquote {
+  margin: 1rem 0;
+  padding: 0.5rem 1rem;
+  border-left: 3px solid #60a5fa;
+  color: #a1a1aa; /* zinc-400 */
+  background-color: #18181b; /* zinc-900 */
+  border-radius: 0 0.25rem 0.25rem 0;
+}
+
+.prose blockquote p {
+  margin-bottom: 0;
+}
+
+/* Code */
+.prose code {
+  font-family: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas,
+    "DejaVu Sans Mono", monospace;
+  font-size: 0.875em;
+}
+
+.prose :not(pre) > code {
+  padding: 0.15em 0.35em;
+  background-color: #27272a; /* zinc-800 */
+  border-radius: 0.25rem;
+  color: #f0abfc; /* fuchsia-300 */
+}
+
+.prose pre {
+  margin: 1rem 0;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+/* Tables */
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.875rem;
+}
+
+.prose th {
+  font-weight: 600;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 2px solid #3f3f46;
+  color: #fafafa;
+}
+
+.prose td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #27272a;
+}
+
+.prose tr:hover td {
+  background-color: #18181b;
+}
+
+/* Images */
+.prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  margin: 1rem 0;
+}
+
+/* Horizontal rule */
+.prose hr {
+  margin: 2rem 0;
+  border: none;
+  border-top: 1px solid #3f3f46;
+}
+
+/* Checkbox (GFM) */
+.prose input[type="checkbox"] {
+  margin-right: 0.5rem;
+  accent-color: #60a5fa;
+}
+
+/* Strikethrough */
+.prose del {
+  color: #71717a; /* zinc-500 */
+}
+
+/* Footnotes */
+.prose .footnotes {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #3f3f46;
+  font-size: 0.875rem;
+  color: #a1a1aa;
+}
