@@ -45,5 +45,9 @@ jobs:
         working-directory: src-tauri
         run: cargo check
 
+      - name: Cargo clippy
+        working-directory: src-tauri
+        run: cargo clippy -- -D warnings
+
       - name: Run tests
         run: pnpm test

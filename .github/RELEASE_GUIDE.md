@@ -59,7 +59,8 @@ Update the version in these files:
 git add -A
 git commit -m "chore: bump version to X.Y.Z"
 git tag vX.Y.Z
-git push origin main --tags
+git push origin main
+git push origin vX.Y.Z
 ```
 
 ### 3. Wait for the release workflow
