@@ -1,0 +1,6 @@
+{
+  "feature": "document-search",
+  "status": "complete",
+  "created": "2026-03-03",
+  "description": "In-document search with Cmd+F, incremental search, match highlighting, and Vim / trigger"
+}

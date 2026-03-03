@@ -21,6 +21,7 @@ import TOCPanel from "./components/TOCPanel";
 import HeadingPicker from "./components/HeadingPicker";
 import ReadingProgress from "./components/ReadingProgress";
 import PeekShell from "./components/PeekShell";
+import SearchBar from "./components/SearchBar";
 import {
   initWindowMode,
   isPeekMode,
@@ -131,7 +132,9 @@ def process_markdown(content: str) -> str:
 |----------|--------|
 | \`Ctrl+T\` | Toggle theme (dark/light) |
 | \`Ctrl+B\` | Toggle TOC panel |
-| \`Ctrl+F\` | Toggle focus mode |
+| \`Cmd+F\` | Document search |
+| \`/\` | Document search (Vim) |
+| \`Cmd+Shift+F\` | Toggle focus mode |
 | \`gd\` | Open heading picker |
 | \`]]\` | Next heading |
 | \`[[\` | Previous heading |
@@ -178,6 +181,7 @@ const App: Component = () => {
   const [markdown, setMarkdown] = createSignal(DEMO_MARKDOWN);
   const [html, setHtml] = createSignal("");
   const [tocVisible, setTocVisible] = createSignal(true);
+  const [searchOpen, setSearchOpen] = createSignal(false);
 
   // Preview container ref
   let previewRef: HTMLDivElement | undefined;
@@ -238,7 +242,14 @@ const App: Component = () => {
 
   // Global keyboard shortcuts
   function handleKeyDown(e: KeyboardEvent) {
-    // Don't handle when input elements are focused
+    // Cmd+F / Ctrl+F always works, even when input is focused (to toggle search)
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "f") {
+      e.preventDefault();
+      setSearchOpen((v) => !v);
+      return;
+    }
+
+    // Don't handle other shortcuts when input elements are focused
     const target = e.target as HTMLElement;
     if (
       target.tagName === "INPUT" ||
@@ -262,8 +273,8 @@ const App: Component = () => {
       return;
     }
 
-    // Ctrl+F: Toggle focus mode
-    if (e.ctrlKey && e.key === "f") {
+    // Cmd+Shift+F / Ctrl+Shift+F: Toggle focus mode (moved from Ctrl+F)
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === "f" || e.key === "F")) {
       e.preventDefault();
       focusMode.toggle();
       return;
@@ -287,6 +298,13 @@ const App: Component = () => {
     if ((e.metaKey || e.ctrlKey) && e.key === "0") {
       e.preventDefault();
       zoom.resetZoom();
+      return;
+    }
+
+    // Vim `/`: Open search (only when search is not already open)
+    if (e.key === "/" && !e.metaKey && !e.ctrlKey && !e.altKey && !searchOpen()) {
+      e.preventDefault();
+      setSearchOpen(true);
       return;
     }
   }
@@ -318,10 +336,17 @@ const App: Component = () => {
           isVisible={tocVisible()}
           onHeadingClick={handleHeadingClick}
         />
-        <Preview
-          html={html()}
-          ref={(el) => (previewRef = el)}
-        />
+        <div class="preview-wrapper">
+          <SearchBar
+            isOpen={searchOpen()}
+            onClose={() => setSearchOpen(false)}
+            getContainer={getPreviewRef}
+          />
+          <Preview
+            html={html()}
+            ref={(el) => (previewRef = el)}
+          />
+        </div>
       </div>
       <HeadingPicker
         headings={headings()}
@@ -339,10 +364,17 @@ const App: Component = () => {
         fallback={<FullContent />}
       >
         <PeekShell>
-          <Preview
-            html={html()}
-            ref={(el) => (previewRef = el)}
-          />
+          <div class="preview-wrapper">
+            <SearchBar
+              isOpen={searchOpen()}
+              onClose={() => setSearchOpen(false)}
+              getContainer={getPreviewRef}
+            />
+            <Preview
+              html={html()}
+              ref={(el) => (previewRef = el)}
+            />
+          </div>
         </PeekShell>
       </Show>
     </Show>
