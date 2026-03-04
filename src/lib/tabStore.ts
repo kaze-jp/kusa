@@ -62,6 +62,8 @@ export interface TabStore {
   markClean(id: string): void;
   /** Save scroll position for a tab */
   saveScrollPosition(id: string, position: number): void;
+  /** Move a tab from one index to another (drag & drop reorder) */
+  moveTab(fromIndex: number, toIndex: number): void;
   /** Check if any tab has unsaved changes */
   hasUnsavedChanges: Accessor<boolean>;
   /** Get number of open tabs */
@@ -252,6 +254,18 @@ export function createTabStore(): TabStore {
     );
   }
 
+  function moveTab(fromIndex: number, toIndex: number): void {
+    if (fromIndex === toIndex) return;
+    setTabs((prev) => {
+      if (fromIndex < 0 || fromIndex >= prev.length) return prev;
+      if (toIndex < 0 || toIndex >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  }
+
   return {
     tabs,
     activeTabId,
@@ -268,6 +282,7 @@ export function createTabStore(): TabStore {
     markDirty,
     markClean,
     saveScrollPosition,
+    moveTab,
     hasUnsavedChanges,
     tabCount,
   };

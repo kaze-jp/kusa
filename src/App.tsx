@@ -1266,6 +1266,7 @@ const App: Component = () => {
         }}
         onTabClose={handleTabClose}
         onNewTab={handleNewTab}
+        onTabMove={(from, to) => tabStore.moveTab(from, to)}
         isMaxTabs={tabStore.tabCount() >= 20}
         hasDir={!!dirPath() && fileList().length > 0}
         onShowFileList={() => setViewMode("file-list")}

@@ -10,7 +10,7 @@
  * - Dark theme styling
  */
 
-import { For, Show, type Component } from "solid-js";
+import { For, Show, createSignal, type Component } from "solid-js";
 import type { Tab } from "../lib/tabStore";
 import type { Accessor } from "solid-js";
 
@@ -20,6 +20,7 @@ interface TabBarProps {
   onTabClick: (id: string) => void;
   onTabClose: (id: string) => void;
   onNewTab: () => void;
+  onTabMove?: (fromIndex: number, toIndex: number) => void;
   isMaxTabs: boolean;
   hasDir?: boolean;
   onShowFileList?: () => void;
@@ -27,6 +28,9 @@ interface TabBarProps {
 }
 
 const TabBar: Component<TabBarProps> = (props) => {
+  const [dragIndex, setDragIndex] = createSignal<number | null>(null);
+  const [dropIndex, setDropIndex] = createSignal<number | null>(null);
+
   return (
     <div class="flex h-9 flex-shrink-0 items-end overflow-x-auto bg-zinc-900 border-b border-zinc-700/50 scrollbar-hide">
       {/* File picker button (only when directory is loaded) */}
@@ -51,7 +55,7 @@ const TabBar: Component<TabBarProps> = (props) => {
       </Show>
 
       <For each={props.tabs()}>
-        {(tab) => {
+        {(tab, index) => {
           const isActive = () => props.activeTabId() === tab.id;
 
           return (
@@ -60,10 +64,43 @@ const TabBar: Component<TabBarProps> = (props) => {
               classList={{
                 "bg-zinc-800 text-zinc-200": isActive(),
                 "bg-zinc-900 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50": !isActive(),
+                "opacity-50": dragIndex() === index(),
+              }}
+              draggable={true}
+              onDragStart={(e) => {
+                setDragIndex(index());
+                e.dataTransfer!.effectAllowed = "move";
+                e.dataTransfer!.setData("text/plain", String(index()));
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer!.dropEffect = "move";
+                setDropIndex(index());
+              }}
+              onDragLeave={() => {
+                setDropIndex(null);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                const from = dragIndex();
+                const to = index();
+                if (from !== null && from !== to) {
+                  props.onTabMove?.(from, to);
+                }
+                setDragIndex(null);
+                setDropIndex(null);
+              }}
+              onDragEnd={() => {
+                setDragIndex(null);
+                setDropIndex(null);
               }}
               onClick={() => props.onTabClick(tab.id)}
               title={tab.isUntitled ? tab.fileName : tab.filePath}
             >
+              {/* Drop indicator */}
+              <Show when={dropIndex() === index() && dragIndex() !== null && dragIndex() !== index()}>
+                <div class="absolute top-0 bottom-0 left-0 w-0.5 bg-blue-500" />
+              </Show>
               {/* Dirty indicator dot */}
               <Show when={tab.isDirty}>
                 <span class="h-2 w-2 rounded-full bg-amber-400 flex-shrink-0" />
