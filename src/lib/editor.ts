@@ -169,6 +169,11 @@ export function createCMEditor(
   // Map jk to escape in insert mode
   Vim.map("jk", "<Esc>", "insert");
 
+  // Yank to system clipboard by default (like vim's clipboard=unnamedplus)
+  Vim.map("y", '"+y', "normal");
+  Vim.map("y", '"+y', "visual");
+  Vim.map("Y", '"+Y', "normal");
+
   // Build extensions
   const extensions = [
     // Override Ctrl+D/U before vim processes them to prevent wrap-around at boundaries
