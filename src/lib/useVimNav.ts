@@ -23,6 +23,10 @@ export interface VimNavOptions {
   onNextTab?: () => void;
   /** Callback for gT (previous tab) */
   onPrevTab?: () => void;
+  /** Callback for i key (enter edit mode) */
+  onEnterEdit?: () => void;
+  /** Accessor for current edit mode — skips navigation when not in preview */
+  getEditMode?: () => string;
 }
 
 /**
@@ -120,8 +124,18 @@ export function useVimNav(
     // Don't handle when picker is open (it has its own handler)
     if (pickerOpen()) return;
 
+    // Skip vim navigation when in edit/split mode (CodeMirror handles keys)
+    if (options?.getEditMode && options.getEditMode() !== "preview") return;
+
     const key = e.key;
     const container = getContainer();
+
+    // i: Enter edit mode
+    if (key === "i" && !pendingKey && options?.onEnterEdit) {
+      e.preventDefault();
+      options.onEnterEdit();
+      return;
+    }
 
     // j/k line scroll
     if (key === "j" && !pendingKey) {
