@@ -104,7 +104,7 @@ graph TB
 | Scroll Detection | IntersectionObserver API | 可視見出しの検出 | ブラウザネイティブAPI |
 | Styling | Tailwind CSS 3.x | テーマ切替、レイアウト、タイポグラフィ | dark/light class 戦略 |
 | Backend | Rust / Tauri v2.10 | テーマ設定の永続化 | 最小限の責務 |
-| Build | pnpm / Vite | バンドル、開発サーバー | Tree shaking有効 |
+| Build | bun / Vite | バンドル、開発サーバー | Tree shaking有効 |
 
 ## System Flows
 

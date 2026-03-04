@@ -4,11 +4,11 @@
 
 - [x] 1. プロジェクト初期セットアップ
 - [x] 1.1 Tauri v2 + SolidJS プロジェクトをスキャフォルドし、開発環境を構築する
-  - `pnpm create tauri-app` で SolidJS + TypeScript テンプレートを生成
+  - `bun create tauri-app` で SolidJS + TypeScript テンプレートを生成
   - Tailwind CSS を導入しダークテーマをデフォルトに設定
   - Tauri プラグイン（cli, single-instance, window-state）をインストール
   - ウィンドウ設定で非表示起動（hidden window pattern）を有効化
-  - `pnpm tauri dev` でアプリが起動することを確認
+  - `bun tauri dev` でアプリが起動することを確認
   - _Requirements: 2.2, 5.3, 6.1_
 
 - [x] 1.2 CLI引数の定義と受け渡しを設定する

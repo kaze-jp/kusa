@@ -39,7 +39,7 @@
 
 - [ ] 5. Type Check and Validation
 - [ ] 5.1 Run type checking and verify build
-  - pnpm build to verify TypeScript compilation
+  - bun build to verify TypeScript compilation
   - Verify no regressions in existing functionality
 
 ## Requirements Coverage

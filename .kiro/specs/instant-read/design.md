@@ -73,7 +73,7 @@ graph TB
 | Styling | Tailwind CSS 3.x | レイアウト、タイポグラフィ | ダークテーマデフォルト |
 | Backend | Rust / Tauri v2.10 | ファイルI/O、CLI、OS連携 | 最小限の責務 |
 | Plugins | cli, single-instance, window-state | CLI引数、単一インスタンス、ウィンドウ永続化 | 公式プラグイン |
-| Build | pnpm / Vite | バンドル、開発サーバー | Tree shaking有効 |
+| Build | bun / Vite | バンドル、開発サーバー | Tree shaking有効 |
 
 ## System Flows
 

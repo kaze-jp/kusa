@@ -53,7 +53,7 @@ Provide summary with GO/NO-GO decision.
 
 ## Tool Guidance
 - **Read context**: Load all specs and steering before validation
-- **Bash for tests**: Execute `pnpm test` and `cargo test`
+- **Bash for tests**: Execute `bun test` and `cargo test`
 - **Grep for traceability**: Search codebase for requirement evidence
 
 ## Output Description

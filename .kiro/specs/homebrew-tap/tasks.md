@@ -9,7 +9,7 @@
 - [x] Create `.github/workflows/ci.yml`
 - [x] Configure triggers (push, PR)
 - [x] Add lint, type-check, cargo check steps
-- [x] Setup Rust, Node.js, pnpm
+- [x] Setup Rust, Node.js, bun
 
 ## Task 3: Create Release Workflow
 - [x] Create `.github/workflows/release.yml`

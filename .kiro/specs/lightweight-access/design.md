@@ -82,7 +82,7 @@ graph TB
 | Backend | Rust / Tauri v2.10 | ウィンドウ生成・構成変更、CLI拡張 | 最小限の責務 |
 | Window API | Tauri WebviewWindowBuilder | peek/fullウィンドウの構成管理 | decorations, always_on_top, focused |
 | Plugins | cli (extended), window-state, single-instance | CLI --peek フラグ、ウィンドウ永続化 | 既存プラグイン拡張 |
-| Build | pnpm / Vite | バンドル、開発サーバー | 既存設定 |
+| Build | bun / Vite | バンドル、開発サーバー | 既存設定 |
 
 ## System Flows
 

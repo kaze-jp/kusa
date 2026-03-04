@@ -35,4 +35,4 @@
 - [ ] Theme-compatible colors for both dark and light themes
 
 ## Task 6: TypeScript validation
-- [ ] Run `pnpm exec tsc --noEmit` to verify no type errors
+- [ ] Run `bun exec tsc --noEmit` to verify no type errors

@@ -277,12 +277,12 @@ Phase 2 完了後、reviewer 呼び出し直前に生成:
 セルフレビュー通過後、品質ゲートで自動チェック:
 
 実行内容（順序実行、全パス必須）:
-1. TypeScript 型チェック (`pnpm typecheck`)
+1. TypeScript 型チェック (`bun typecheck`)
 2. Rust 型チェック (`cd src-tauri && cargo check`)
-3. ESLint + Prettier (`pnpm lint`)
-4. フロントエンドテスト (`pnpm test`)
+3. ESLint + Prettier (`bun lint`)
+4. フロントエンドテスト (`bun test`)
 5. Rust テスト (`cd src-tauri && cargo test`)
-6. ビルド確認 (`pnpm tauri build --debug`)
+6. ビルド確認 (`bun tauri build --debug`)
 
 **全て通過するまで Phase 3.5 に進まない。**
 
@@ -319,7 +319,7 @@ Phase 2 完了後、reviewer 呼び出し直前に生成:
 
 ## 次のアクション
 → proceed: PR作成 & CodeRabbit レビューへ
-→ verify: `pnpm tauri dev` で動作確認してから判断
+→ verify: `bun tauri dev` で動作確認してから判断
 → revise: 修正指示を記載
 ```
 
@@ -472,7 +472,7 @@ gh pr merge $PR_NUMBER --squash --delete-branch
 - spec.json phase → "completed"
 
 ## 確認ポイント
-- 動作確認推奨: 🖥️ `pnpm tauri dev` → [何を確認するか]
+- 動作確認推奨: 🖥️ `bun tauri dev` → [何を確認するか]
 
 ## 成果物
 📄 PR #<number>: <PR URL>

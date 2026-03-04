@@ -85,7 +85,7 @@ graph TB
 | HTTP Client | reqwest 0.12 | GitHub API / URL fetch | Rust 側で CORS 制限回避 |
 | Clipboard | tauri-plugin-clipboard-manager 2.x | システムクリップボード読み取り | Tauri 公式プラグイン |
 | CLI | tauri-plugin-cli 2.x | `--clipboard` / `-c` フラグ追加 | instant-read で導入済み |
-| Build | pnpm / Vite | バンドル、開発サーバー | instant-read と共有 |
+| Build | bun / Vite | バンドル、開発サーバー | instant-read と共有 |
 
 ## System Flows
 

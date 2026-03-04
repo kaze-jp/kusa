@@ -16,7 +16,7 @@
 - **Context**: 新規プロジェクトのスキャフォルド方法
 - **Sources**: Tauri 公式ドキュメント、create-tauri-app
 - **Findings**:
-  - `pnpm create tauri-app my-app --template solid-ts` で SolidJS + TypeScript テンプレート生成
+  - `bun create tauri-app my-app --template solid-ts` で SolidJS + TypeScript テンプレート生成
   - Tauri v2.10.2 (2025年2月) が最新安定版
   - CLI引数は `tauri-plugin-cli` で処理、`tauri.conf.json` の `plugins.cli` で定義
 - **Implications**: CLI引数処理は Rust プラグイン経由、フロントエンドに `getMatches()` で渡す
