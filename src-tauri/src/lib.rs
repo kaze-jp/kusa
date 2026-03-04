@@ -154,6 +154,9 @@ fn resolve_and_emit<R: tauri::Runtime, E: Emitter<R>>(emitter: &E, raw_path: &st
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Capture original CWD before Tauri may change it (e.g. tauri dev runs from src-tauri/)
+    let original_cwd = std::env::current_dir().ok();
+
     // Read stdin before Tauri init (must happen before event loop)
     let stdin_content = commands::read_stdin_if_piped();
 
@@ -192,7 +195,7 @@ pub fn run() {
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_cli::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .setup(|app| {
+        .setup(move |app| {
             // Get actual monitor dimensions for the "half" preset.
             // Falls back to 1920x1080 if the primary monitor cannot be detected.
             let (screen_width, screen_height) = app
@@ -246,18 +249,44 @@ pub fn run() {
                 eprintln!("Fatal: failed to create window: {}", e);
             }
 
-            // Resolve file path and store CLI args for frontend to pull via invoke
+            // Resolve file path to absolute, trying multiple base directories
             let resolved_file = file_path.as_ref().map(|path| {
                 let p = PathBuf::from(path);
+                // If already absolute, just canonicalize
+                if p.is_absolute() {
+                    return std::fs::canonicalize(&p)
+                        .map(|c| c.to_string_lossy().to_string())
+                        .unwrap_or_else(|_| path.clone());
+                }
+                // Try relative to current cwd
                 std::fs::canonicalize(&p)
+                    .or_else(|_| {
+                        // Try relative to original CWD
+                        if let Some(ref cwd) = original_cwd {
+                            std::fs::canonicalize(cwd.join(path))
+                        } else {
+                            Err(std::io::Error::new(std::io::ErrorKind::NotFound, ""))
+                        }
+                    })
+                    .or_else(|_| {
+                        // During `tauri dev`, cwd may be src-tauri/ — try parent
+                        if let Some(ref cwd) = original_cwd {
+                            if let Some(parent) = cwd.parent() {
+                                std::fs::canonicalize(parent.join(path))
+                            } else {
+                                Err(std::io::Error::new(std::io::ErrorKind::NotFound, ""))
+                            }
+                        } else {
+                            Err(std::io::Error::new(std::io::ErrorKind::NotFound, ""))
+                        }
+                    })
                     .map(|c| c.to_string_lossy().to_string())
                     .unwrap_or_else(|_| path.clone())
             });
 
             let resolved_dir = if file_path.is_none() {
-                // Check if resolved_file is actually a directory
-                std::env::current_dir()
-                    .ok()
+                // No file arg: use original CWD for directory listing
+                original_cwd.as_ref()
                     .map(|c| c.to_string_lossy().to_string())
             } else {
                 // Check if the resolved path is a directory
@@ -279,9 +308,9 @@ pub fn run() {
             };
 
             let cli_args_data = CliArgsData {
-                file: final_file,
+                file: final_file.clone(),
                 clipboard: clipboard_flag,
-                dir: resolved_dir,
+                dir: resolved_dir.clone(),
             };
 
             {

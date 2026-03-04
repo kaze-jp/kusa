@@ -217,7 +217,9 @@ const App: Component = () => {
       // Start watching the file for external changes
       await fileWatcher.watch(filePath);
     } catch (err) {
-      console.error("Failed to read file:", err);
+      console.error("[kusa] Failed to read file:", filePath, err);
+      setErrorMessage(`Cannot open file: ${filePath}\n${String(err)}`);
+      setViewMode("error");
     }
   }
 
