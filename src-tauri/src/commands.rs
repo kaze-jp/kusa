@@ -154,7 +154,7 @@ fn decode_github_content(response: &GitHubContentsResponse) -> Result<String, St
         ));
     }
 
-    let cleaned = response.content.replace('\n', "").replace('\r', "");
+    let cleaned = response.content.replace(['\n', '\r'], "");
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(&cleaned)
         .map_err(|e| format!("base64 デコードエラー: {}", e))?;
@@ -189,8 +189,6 @@ pub async fn fetch_url(
         .map_err(|e| {
             if e.is_timeout() {
                 "リクエストがタイムアウトしました（10秒）".to_string()
-            } else if e.is_connect() {
-                format!("ネットワーク接続エラー: {}", e)
             } else {
                 format!("ネットワーク接続エラー: {}", e)
             }
@@ -220,7 +218,7 @@ pub async fn fetch_url(
                         .unwrap_or_default()
                         .as_secs();
                     let minutes = if reset > now {
-                        (reset - now + 59) / 60
+                        (reset - now).div_ceil(60)
                     } else {
                         1
                     };

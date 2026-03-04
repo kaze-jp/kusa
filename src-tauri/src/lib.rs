@@ -51,15 +51,7 @@ fn resolve_peek_config(matches: &tauri_plugin_cli::Matches, screen_width: f64, s
     // Pipe input (stdin is not terminal) defaults to peek unless --no-peek
     let stdin_is_pipe = !std::io::stdin().is_terminal();
 
-    let is_peek = if has_no_peek_flag {
-        false
-    } else if has_peek_flag {
-        true
-    } else if stdin_is_pipe {
-        true // pipe input defaults to peek
-    } else {
-        false
-    };
+    let is_peek = !has_no_peek_flag && (has_peek_flag || stdin_is_pipe);
 
     // Resolve size preset (default depends on mode)
     let default_preset = if is_peek { "peek" } else { "full" };
