@@ -21,11 +21,35 @@ interface TabBarProps {
   onTabClose: (id: string) => void;
   onNewTab: () => void;
   isMaxTabs: boolean;
+  hasDir?: boolean;
+  onShowFileList?: () => void;
+  onOpenFilePicker?: () => void;
 }
 
 const TabBar: Component<TabBarProps> = (props) => {
   return (
     <div class="flex h-9 flex-shrink-0 items-end overflow-x-auto bg-zinc-900 border-b border-zinc-700/50 scrollbar-hide">
+      {/* File picker button (only when directory is loaded) */}
+      <Show when={props.hasDir}>
+        <button
+          class="flex h-8 items-center px-2.5 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-colors select-none border-r border-zinc-700/30"
+          onClick={() => props.onOpenFilePicker?.()}
+          title="Open file (⌘P)"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+          >
+            <circle cx="7" cy="7" r="4.5" />
+            <path d="M10.5 10.5L14 14" stroke-linecap="round" />
+          </svg>
+        </button>
+      </Show>
+
       <For each={props.tabs()}>
         {(tab) => {
           const isActive = () => props.activeTabId() === tab.id;

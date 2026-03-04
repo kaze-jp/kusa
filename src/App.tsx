@@ -38,6 +38,7 @@ import ReadingProgress from "./components/ReadingProgress";
 import PeekShell from "./components/PeekShell";
 import SearchBar from "./components/SearchBar";
 import FileList, { type MdFileEntry } from "./components/FileList";
+import FilePicker from "./components/FilePicker";
 import TabBar from "./components/TabBar";
 import ErrorDisplay from "./components/ErrorDisplay";
 import DropZone from "./components/DropZone";
@@ -78,6 +79,7 @@ const App: Component = () => {
   const [html, setHtml] = createSignal("");
   const [tocVisible, setTocVisible] = createSignal(true);
   const [searchOpen, setSearchOpen] = createSignal(false);
+  const [filePickerOpen, setFilePickerOpen] = createSignal(false);
 
   // Error state
   const [errorMessage, setErrorMessage] = createSignal("");
@@ -261,8 +263,17 @@ const App: Component = () => {
     }
   }
 
-  /** Handle file selection from FileList */
+  /** Handle file selection from FileList or FilePicker */
   function handleFileSelect(path: string) {
+    openFileInTab(path);
+  }
+
+  /** Handle file selection from FilePicker */
+  function handleFilePickerSelect(path: string) {
+    // Return to preview mode if in edit/split
+    if (editMode() !== "preview") {
+      returnToPreview();
+    }
     openFileInTab(path);
   }
 
@@ -666,6 +677,15 @@ const App: Component = () => {
 
     // === Global shortcuts (work even when CodeMirror editor has focus) ===
 
+    // Cmd+P / Ctrl+P: Toggle file picker (only when dirPath is set)
+    if (isMeta && !e.shiftKey && e.key === "p") {
+      if (dirPath() && fileList().length > 0) {
+        e.preventDefault();
+        setFilePickerOpen((v) => !v);
+        return;
+      }
+    }
+
     // Cmd+F / Ctrl+F: Toggle search
     if (isMeta && !e.shiftKey && e.key === "f") {
       e.preventDefault();
@@ -685,11 +705,19 @@ const App: Component = () => {
       return;
     }
 
-    // Escape: Return to preview from edit/split NORMAL mode
-    if (e.key === "Escape" && editMode() !== "preview" && vimMode() === "NORMAL" && !searchOpen()) {
-      e.preventDefault();
-      returnToPreview();
-      return;
+    // Escape: Return to preview from edit/split NORMAL mode, or from file-list to active tab
+    if (e.key === "Escape" && !searchOpen() && !filePickerOpen()) {
+      if (editMode() !== "preview" && vimMode() === "NORMAL") {
+        e.preventDefault();
+        returnToPreview();
+        return;
+      }
+      // Return from file-list view to active tab
+      if (viewMode() === "file-list" && tabStore.tabCount() > 0) {
+        e.preventDefault();
+        setViewMode("preview");
+        return;
+      }
     }
 
     // Cmd+W: Close active tab, or close window if no tabs
@@ -1022,6 +1050,15 @@ const App: Component = () => {
   // Full mode content layout
   const FullContent = () => (
     <div class="flex h-full flex-col">
+      {/* File picker overlay (fzf-like) */}
+      <FilePicker
+        files={fileList()}
+        isOpen={filePickerOpen()}
+        dirPath={dirPath() ?? ""}
+        onSelect={handleFilePickerSelect}
+        onClose={() => setFilePickerOpen(false)}
+      />
+
       {/* Tab bar: always shown (includes + button) */}
       <TabBar
         tabs={tabStore.tabs}
@@ -1030,6 +1067,9 @@ const App: Component = () => {
         onTabClose={handleTabClose}
         onNewTab={handleNewTab}
         isMaxTabs={tabStore.tabCount() >= 20}
+        hasDir={!!dirPath() && fileList().length > 0}
+        onShowFileList={() => setViewMode("file-list")}
+        onOpenFilePicker={() => setFilePickerOpen(true)}
       />
 
       {/* Main content area */}
