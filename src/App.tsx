@@ -377,6 +377,26 @@ const App: Component = () => {
     const tab = tabStore.activeTab();
     if (!tab) return;
 
+    // Capture preview scroll position before switching to split mode
+    if (mode === "split" && previewRef) {
+      const els = previewRef.querySelectorAll<HTMLElement>("[data-source-line]");
+      const containerRect = previewRef.getBoundingClientRect();
+      let bestLine: number | null = null;
+      let bestDist = Infinity;
+      for (const el of els) {
+        const v = el.getAttribute("data-source-line");
+        if (!v) continue;
+        const rect = el.getBoundingClientRect();
+        const dist = Math.abs(rect.top - containerRect.top);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestLine = parseInt(v, 10);
+        }
+        if (rect.top > containerRect.bottom) break;
+      }
+      preSplitPreviewLine = bestLine;
+    }
+
     syncEngineRef?.destroy();
     syncEngineRef = createSyncEngineForFile(tab.filePath, markdown());
 
@@ -808,6 +828,9 @@ const App: Component = () => {
     );
   };
 
+  // Capture preview line before switching to split mode for initial sync
+  let preSplitPreviewLine: number | null = null;
+
   // Split mode content (editor left + preview right + status bar)
   const SplitContent = () => {
     const modules = lazyLoader.getModules();
@@ -819,9 +842,24 @@ const App: Component = () => {
     const handleSplitEditorReady = (editor: CMEditorInstance) => {
       handleEditorReady(editor);
 
-      // Initial sync: move editor cursor to match current preview scroll
-      if (splitPreviewRef && scrollSyncRef) {
-        // Wait for preview DOM to be ready
+      // Initial sync: move editor cursor to match saved preview position
+      const savedLine = preSplitPreviewLine;
+      preSplitPreviewLine = null; // consume once
+
+      if (savedLine && savedLine > 1) {
+        const view = editor.getView();
+        if (view) {
+          const doc = view.state.doc;
+          if (savedLine <= doc.lines) {
+            const pos = doc.line(savedLine).from;
+            view.dispatch({
+              selection: { anchor: pos },
+              scrollIntoView: true,
+            });
+          }
+        }
+      } else if (splitPreviewRef && scrollSyncRef) {
+        // Fallback: query current preview scroll position
         requestAnimationFrame(() => {
           const line = scrollSyncRef?.getLineFromScroll();
           if (line && line > 1) {
@@ -844,6 +882,12 @@ const App: Component = () => {
     const handleSplitCursorChange = (pos: { line: number; col: number }) => {
       setCursorPosition(pos);
       scrollSyncRef?.syncToLine(pos.line);
+    };
+
+    const handleSplitScroll = () => {
+      // Skip manual-scroll detection during programmatic scrolls
+      if (scrollSyncRef?.isProgrammaticScroll()) return;
+      scrollSyncRef?.notifyManualScroll();
     };
 
     // Initialize scroll sync after preview mounts
@@ -881,7 +925,7 @@ const App: Component = () => {
               <Preview
                 html={html()}
                 ref={initScrollSync}
-                onScroll={() => scrollSyncRef?.notifyManualScroll()}
+                onScroll={handleSplitScroll}
               />
             }
           />

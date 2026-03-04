@@ -21,6 +21,8 @@ export interface ScrollSyncInstance {
   getLineFromScroll(): number | null;
   /** Mark that the user is manually scrolling the preview. */
   notifyManualScroll(): void;
+  /** Whether a programmatic scroll is in progress (skip manual-scroll detection). */
+  isProgrammaticScroll(): boolean;
   destroy(): void;
 }
 
@@ -82,7 +84,9 @@ export function createScrollSync(config: ScrollSyncConfig): ScrollSyncInstance {
 
   let timer: ReturnType<typeof setTimeout> | null = null;
   let manualScrollTimer: ReturnType<typeof setTimeout> | null = null;
+  let programmaticScrollTimer: ReturnType<typeof setTimeout> | null = null;
   let isManualScrolling = false;
+  let _isProgrammaticScroll = false;
   let destroyed = false;
   let lastSyncedLine = -1;
 
@@ -109,7 +113,6 @@ export function createScrollSync(config: ScrollSyncConfig): ScrollSyncInstance {
     const items = collectLineElements(container);
     if (items.length === 0) return null;
 
-    const scrollTop = container.scrollTop;
     const containerRect = container.getBoundingClientRect();
 
     // Find the element closest to the top of the visible area
@@ -134,6 +137,7 @@ export function createScrollSync(config: ScrollSyncConfig): ScrollSyncInstance {
   function notifyManualScroll() {
     if (destroyed) return;
     isManualScrolling = true;
+    lastSyncedLine = -1; // Reset to allow re-sync after manual scroll ends
     if (manualScrollTimer !== null) clearTimeout(manualScrollTimer);
     manualScrollTimer = setTimeout(() => {
       manualScrollTimer = null;
@@ -141,10 +145,15 @@ export function createScrollSync(config: ScrollSyncConfig): ScrollSyncInstance {
     }, 3000);
   }
 
+  function isProgrammaticScroll(): boolean {
+    return _isProgrammaticScroll;
+  }
+
   function destroy() {
     destroyed = true;
     if (timer !== null) clearTimeout(timer);
     if (manualScrollTimer !== null) clearTimeout(manualScrollTimer);
+    if (programmaticScrollTimer !== null) clearTimeout(programmaticScrollTimer);
   }
 
   // --- Internal ---
@@ -158,6 +167,14 @@ export function createScrollSync(config: ScrollSyncConfig): ScrollSyncInstance {
     const match = findClosest(items, line);
     if (!match) return;
 
+    // Mark as programmatic scroll to prevent onScroll from triggering manual-scroll detection
+    _isProgrammaticScroll = true;
+    if (programmaticScrollTimer !== null) clearTimeout(programmaticScrollTimer);
+    programmaticScrollTimer = setTimeout(() => {
+      programmaticScrollTimer = null;
+      _isProgrammaticScroll = false;
+    }, 500); // Clear after smooth scroll settles
+
     // Scroll the element into view within the preview container
     const containerRect = container.getBoundingClientRect();
     const elRect = match.el.getBoundingClientRect();
@@ -170,5 +187,5 @@ export function createScrollSync(config: ScrollSyncConfig): ScrollSyncInstance {
     });
   }
 
-  return { syncToLine, getLineFromScroll, notifyManualScroll, destroy };
+  return { syncToLine, getLineFromScroll, notifyManualScroll, isProgrammaticScroll, destroy };
 }
