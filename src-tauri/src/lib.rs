@@ -2,7 +2,6 @@ mod commands;
 mod watcher;
 mod window_presets;
 
-use std::io::IsTerminal;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{Emitter, WebviewWindowBuilder, WebviewUrl, Manager, RunEvent};
@@ -57,12 +56,9 @@ fn resolve_peek_config(matches: &tauri_plugin_cli::Matches, screen_width: f64, s
     });
 
     // Determine peek mode:
-    // --no-peek always forces full (even if --peek is also present)
-    // --peek explicitly enables peek
-    // Pipe input (stdin is not terminal) defaults to peek unless --no-peek
-    let stdin_is_pipe = !std::io::stdin().is_terminal();
-
-    let is_peek = !has_no_peek_flag && (has_peek_flag || stdin_is_pipe);
+    // --peek explicitly enables peek mode
+    // Without --peek, always use full mode
+    let is_peek = has_peek_flag && !has_no_peek_flag;
 
     // Resolve size preset (default depends on mode)
     let default_preset = if is_peek { "peek" } else { "full" };
