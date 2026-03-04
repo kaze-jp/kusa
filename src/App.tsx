@@ -39,6 +39,7 @@ import PeekShell from "./components/PeekShell";
 import SearchBar from "./components/SearchBar";
 import FileList, { type MdFileEntry } from "./components/FileList";
 import FilePicker from "./components/FilePicker";
+import { useRecentFiles } from "./lib/useRecentFiles";
 import TabBar from "./components/TabBar";
 import ErrorDisplay from "./components/ErrorDisplay";
 import DropZone from "./components/DropZone";
@@ -80,6 +81,7 @@ const App: Component = () => {
   const [tocVisible, setTocVisible] = createSignal(true);
   const [searchOpen, setSearchOpen] = createSignal(false);
   const [filePickerOpen, setFilePickerOpen] = createSignal(false);
+  const [systemPickerOpen, setSystemPickerOpen] = createSignal(false);
 
   // Error state
   const [errorMessage, setErrorMessage] = createSignal("");
@@ -87,6 +89,9 @@ const App: Component = () => {
 
   // Buffer manager for universal input (stdin, clipboard, github, url)
   const bufferManager = createBufferManager();
+
+  // Recent files history
+  const recentFiles = useRecentFiles();
 
   // Track whether initial input has been resolved to avoid race conditions
   let initialInputResolved = false;
@@ -256,6 +261,9 @@ const App: Component = () => {
 
       // Start watching the file for external changes
       await fileWatcher.watch(filePath);
+
+      // Track in recent files
+      recentFiles.addEntry(filePath, fileName);
     } catch (err) {
       console.error("[kusa] Failed to read file:", filePath, err);
       setErrorMessage(`Cannot open file: ${filePath}\n${String(err)}`);
@@ -677,6 +685,14 @@ const App: Component = () => {
 
     // === Global shortcuts (work even when CodeMirror editor has focus) ===
 
+    // Cmd+Shift+P / Ctrl+Shift+P: Toggle system file picker
+    if (isMeta && e.shiftKey && (e.key === "p" || e.key === "P")) {
+      e.preventDefault();
+      recentFiles.load();
+      setSystemPickerOpen((v) => !v);
+      return;
+    }
+
     // Cmd+P / Ctrl+P: Toggle file picker (only when dirPath is set)
     if (isMeta && !e.shiftKey && e.key === "p") {
       if (dirPath() && fileList().length > 0) {
@@ -706,7 +722,7 @@ const App: Component = () => {
     }
 
     // Escape: Return to preview from edit/split NORMAL mode, or from file-list to active tab
-    if (e.key === "Escape" && !searchOpen() && !filePickerOpen()) {
+    if (e.key === "Escape" && !searchOpen() && !filePickerOpen() && !systemPickerOpen()) {
       if (editMode() !== "preview" && vimMode() === "NORMAL") {
         e.preventDefault();
         returnToPreview();
@@ -806,6 +822,16 @@ const App: Component = () => {
     if (isMeta && e.key === "0") {
       e.preventDefault();
       zoom.resetZoom();
+      return;
+    }
+
+    // Cmd+Shift+V / Ctrl+Shift+V: Preview clipboard content
+    if (isMeta && e.shiftKey && (e.key === "v" || e.key === "V")) {
+      e.preventDefault();
+      invoke<InputContent>("read_clipboard").then(
+        (content) => displayBufferContent(content),
+        (err) => handleInputError(err),
+      );
       return;
     }
 
@@ -1057,13 +1083,25 @@ const App: Component = () => {
   // Full mode content layout
   const FullContent = () => (
     <div class="flex h-full flex-col">
-      {/* File picker overlay (fzf-like) */}
+      {/* File picker overlay — directory mode */}
       <FilePicker
         files={fileList()}
         isOpen={filePickerOpen()}
         dirPath={dirPath() ?? ""}
         onSelect={handleFilePickerSelect}
         onClose={() => setFilePickerOpen(false)}
+        mode="directory"
+      />
+
+      {/* File picker overlay — system mode */}
+      <FilePicker
+        files={[]}
+        isOpen={systemPickerOpen()}
+        dirPath=""
+        onSelect={handleFilePickerSelect}
+        onClose={() => setSystemPickerOpen(false)}
+        mode="system"
+        recentFiles={recentFiles.entries()}
       />
 
       {/* Tab bar: always shown (includes + button) */}

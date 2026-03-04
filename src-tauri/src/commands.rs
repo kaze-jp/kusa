@@ -6,9 +6,27 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::time::UNIX_EPOCH;
 use tauri::LogicalSize;
+use walkdir::WalkDir;
 
 use crate::window_presets::FULL_SIZE;
 use crate::WindowModeState;
+
+/// Directories to skip during recursive traversal.
+const SKIP_DIRS: &[&str] = &[
+    ".git",
+    "node_modules",
+    ".cache",
+    "target",
+    ".venv",
+    "__pycache__",
+    ".next",
+    ".nuxt",
+    "dist",
+    "build",
+    ".cargo",
+    ".rustup",
+    "vendor",
+];
 
 /// Shared type for all input sources (file, stdin, clipboard, github, url)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,6 +62,52 @@ pub struct MdFileEntry {
     pub size: u64,
 }
 
+/// Check if a directory entry should be skipped during traversal.
+fn should_skip_dir(name: &str) -> bool {
+    if name.starts_with('.') {
+        return true;
+    }
+    SKIP_DIRS.contains(&name)
+}
+
+/// Check if a file has a markdown extension.
+fn is_md_extension(path: &std::path::Path) -> bool {
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    ext == "md" || ext == "markdown" || ext == "mdx"
+}
+
+/// Build an MdFileEntry from a walkdir entry.
+fn build_md_entry(entry: &walkdir::DirEntry) -> MdFileEntry {
+    let path = entry.path();
+    let name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("")
+        .to_string();
+
+    let metadata = entry.metadata().ok();
+
+    let modified_at = metadata
+        .as_ref()
+        .and_then(|m| m.modified().ok())
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    let size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
+
+    MdFileEntry {
+        name,
+        path: path.to_string_lossy().to_string(),
+        modified_at,
+        size,
+    }
+}
+
 #[tauri::command]
 pub fn list_md_files(dir_path: String) -> Result<Vec<MdFileEntry>, String> {
     let canonical = fs::canonicalize(&dir_path)
@@ -53,49 +117,93 @@ pub fn list_md_files(dir_path: String) -> Result<Vec<MdFileEntry>, String> {
         return Err(format!("'{}' is not a directory", canonical.display()));
     }
 
-    let entries = fs::read_dir(&canonical)
-        .map_err(|e| format!("Cannot read directory '{}': {}", canonical.display(), e))?;
+    let mut files: Vec<MdFileEntry> = Vec::new();
+
+    let walker = WalkDir::new(&canonical)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(|e| {
+            if e.file_type().is_dir() {
+                if e.path() == canonical {
+                    return true;
+                }
+                let name = e.file_name().to_str().unwrap_or("");
+                return !should_skip_dir(name);
+            }
+            true
+        });
+
+    for entry in walker.filter_map(|e| e.ok()) {
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        if !is_md_extension(entry.path()) {
+            continue;
+        }
+        files.push(build_md_entry(&entry));
+    }
+
+    files.sort_by(|a, b| b.modified_at.cmp(&a.modified_at));
+
+    Ok(files)
+}
+
+#[tauri::command]
+pub fn search_md_files(
+    root_path: String,
+    max_results: Option<usize>,
+    max_depth: Option<usize>,
+) -> Result<Vec<MdFileEntry>, String> {
+    // Expand tilde
+    let expanded = if root_path == "~" {
+        dirs::home_dir()
+            .ok_or_else(|| "Cannot determine home directory".to_string())?
+    } else if let Some(rest) = root_path.strip_prefix("~/") {
+        let home = dirs::home_dir()
+            .ok_or_else(|| "Cannot determine home directory".to_string())?;
+        home.join(rest)
+    } else {
+        PathBuf::from(&root_path)
+    };
+
+    let canonical = fs::canonicalize(&expanded)
+        .map_err(|e| format!("Cannot resolve path '{}': {}", root_path, e))?;
+
+    if !canonical.is_dir() {
+        return Err(format!("'{}' is not a directory", canonical.display()));
+    }
+
+    let depth = max_depth.unwrap_or(8);
+    let limit = max_results.unwrap_or(1000);
 
     let mut files: Vec<MdFileEntry> = Vec::new();
 
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if !path.is_file() {
-            continue;
-        }
-
-        let ext = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("")
-            .to_lowercase();
-        if ext != "md" && ext != "markdown" && ext != "mdx" {
-            continue;
-        }
-
-        let name = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("")
-            .to_string();
-
-        let metadata = entry.metadata().ok();
-
-        let modified_at = metadata
-            .as_ref()
-            .and_then(|m| m.modified().ok())
-            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
-
-        let size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
-
-        files.push(MdFileEntry {
-            name,
-            path: path.to_string_lossy().to_string(),
-            modified_at,
-            size,
+    let walker = WalkDir::new(&canonical)
+        .max_depth(depth)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(|e| {
+            if e.file_type().is_dir() {
+                if e.path() == canonical {
+                    return true;
+                }
+                let name = e.file_name().to_str().unwrap_or("");
+                return !should_skip_dir(name);
+            }
+            true
         });
+
+    for entry in walker.filter_map(|e| e.ok()) {
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        if !is_md_extension(entry.path()) {
+            continue;
+        }
+        files.push(build_md_entry(&entry));
+        if files.len() >= limit {
+            break;
+        }
     }
 
     files.sort_by(|a, b| b.modified_at.cmp(&a.modified_at));
@@ -561,6 +669,129 @@ mod tests {
         let result = list_md_files("/nonexistent/directory".to_string());
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Cannot resolve directory"));
+    }
+
+    #[test]
+    fn test_list_md_files_recursive() {
+        let dir = TempDir::new().unwrap();
+        fs::write(dir.path().join("root.md"), "# Root").unwrap();
+        let sub = dir.path().join("docs");
+        fs::create_dir(&sub).unwrap();
+        fs::write(sub.join("nested.md"), "# Nested").unwrap();
+        let deep = sub.join("deep");
+        fs::create_dir(&deep).unwrap();
+        fs::write(deep.join("deep.md"), "# Deep").unwrap();
+
+        let result = list_md_files(dir.path().to_string_lossy().to_string());
+        assert!(result.is_ok());
+        let files = result.unwrap();
+        assert_eq!(files.len(), 3);
+        assert!(files.iter().any(|f| f.name == "root.md"));
+        assert!(files.iter().any(|f| f.name == "nested.md"));
+        assert!(files.iter().any(|f| f.name == "deep.md"));
+    }
+
+    #[test]
+    fn test_list_md_files_skips_hidden_and_excluded() {
+        let dir = TempDir::new().unwrap();
+        fs::write(dir.path().join("visible.md"), "# Visible").unwrap();
+
+        let git = dir.path().join(".git");
+        fs::create_dir(&git).unwrap();
+        fs::write(git.join("hidden.md"), "# Hidden").unwrap();
+
+        let nm = dir.path().join("node_modules");
+        fs::create_dir(&nm).unwrap();
+        fs::write(nm.join("dep.md"), "# Dep").unwrap();
+
+        let result = list_md_files(dir.path().to_string_lossy().to_string());
+        assert!(result.is_ok());
+        let files = result.unwrap();
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].name, "visible.md");
+    }
+
+    // --- search_md_files tests ---
+
+    #[test]
+    fn test_search_md_files_basic() {
+        let dir = TempDir::new().unwrap();
+        fs::write(dir.path().join("a.md"), "# A").unwrap();
+        let sub = dir.path().join("sub");
+        fs::create_dir(&sub).unwrap();
+        fs::write(sub.join("b.md"), "# B").unwrap();
+
+        let result = search_md_files(
+            dir.path().to_string_lossy().to_string(),
+            None,
+            None,
+        );
+        assert!(result.is_ok());
+        let files = result.unwrap();
+        assert_eq!(files.len(), 2);
+    }
+
+    #[test]
+    fn test_search_md_files_max_results() {
+        let dir = TempDir::new().unwrap();
+        for i in 0..10 {
+            fs::write(dir.path().join(format!("file{}.md", i)), "# File").unwrap();
+        }
+
+        let result = search_md_files(
+            dir.path().to_string_lossy().to_string(),
+            Some(3),
+            None,
+        );
+        assert!(result.is_ok());
+        assert!(result.unwrap().len() <= 3);
+    }
+
+    #[test]
+    fn test_search_md_files_max_depth() {
+        let dir = TempDir::new().unwrap();
+        fs::write(dir.path().join("root.md"), "# Root").unwrap();
+        let l1 = dir.path().join("l1");
+        fs::create_dir(&l1).unwrap();
+        fs::write(l1.join("l1.md"), "# L1").unwrap();
+        let l2 = l1.join("l2");
+        fs::create_dir(&l2).unwrap();
+        fs::write(l2.join("l2.md"), "# L2").unwrap();
+
+        // depth=1 should only get root files and l1 files
+        let result = search_md_files(
+            dir.path().to_string_lossy().to_string(),
+            None,
+            Some(1),
+        );
+        assert!(result.is_ok());
+        let files = result.unwrap();
+        assert_eq!(files.len(), 2);
+    }
+
+    #[test]
+    fn test_search_md_files_skips_excluded() {
+        let dir = TempDir::new().unwrap();
+        fs::write(dir.path().join("visible.md"), "# Visible").unwrap();
+        let target = dir.path().join("target");
+        fs::create_dir(&target).unwrap();
+        fs::write(target.join("build.md"), "# Build").unwrap();
+
+        let result = search_md_files(
+            dir.path().to_string_lossy().to_string(),
+            None,
+            None,
+        );
+        assert!(result.is_ok());
+        let files = result.unwrap();
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].name, "visible.md");
+    }
+
+    #[test]
+    fn test_search_md_files_not_found() {
+        let result = search_md_files("/nonexistent/path".to_string(), None, None);
+        assert!(result.is_err());
     }
 
     // --- InputContent tests ---

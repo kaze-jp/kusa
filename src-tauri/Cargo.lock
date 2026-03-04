@@ -2209,6 +2209,7 @@ dependencies = [
  "tauri-plugin-window-state",
  "tempfile",
  "tokio",
+ "walkdir",
 ]
 
 [[package]]

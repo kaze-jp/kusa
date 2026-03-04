@@ -166,6 +166,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::read_file,
             commands::list_md_files,
+            commands::search_md_files,
             commands::read_stdin,
             commands::read_clipboard,
             commands::fetch_url,
