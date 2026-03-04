@@ -1,16 +1,19 @@
 import { createSignal, onCleanup } from "solid-js";
 
 /**
- * Tracks which heading is currently visible in the preview container
- * using IntersectionObserver. Returns the active heading ID as a signal.
+ * Tracks which heading is currently active in the preview container
+ * using scroll position. Returns the active heading ID as a signal.
+ *
+ * Algorithm: find the last heading whose top edge has scrolled past
+ * a threshold near the top of the container. Falls back to the first
+ * heading when nothing has scrolled past yet.
  */
 export function useActiveHeading() {
   const [activeId, setActiveId] = createSignal<string | null>(null);
-  let observer: IntersectionObserver | null = null;
+  let cleanupFn: (() => void) | null = null;
 
   /**
-   * Start observing heading elements within the given container.
-   * Tracks which heading is closest to the top of the viewport.
+   * Start tracking heading elements within the given scroll container.
    */
   function observe(container: HTMLElement) {
     disconnect();
@@ -24,69 +27,54 @@ export function useActiveHeading() {
       return;
     }
 
-    // Track visibility of all headings
-    const visibleHeadings = new Map<string, IntersectionObserverEntry>();
+    let ticking = false;
 
-    observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          const id = (entry.target as HTMLElement).id;
-          if (entry.isIntersecting) {
-            visibleHeadings.set(id, entry);
-          } else {
-            visibleHeadings.delete(id);
-          }
+    function update() {
+      ticking = false;
+
+      const containerTop = container.getBoundingClientRect().top;
+      // A heading is "active" when its top edge is at or above this
+      // threshold (slightly below the container's top edge).
+      const threshold = containerTop + 40;
+
+      let active: string | null = null;
+
+      for (const el of headingElements) {
+        const rect = el.getBoundingClientRect();
+        if (rect.top <= threshold) {
+          active = el.id;
         }
-
-        // Find the topmost visible heading
-        if (visibleHeadings.size > 0) {
-          let topmost: { id: string; top: number } | null = null;
-          for (const [id, entry] of visibleHeadings) {
-            if (!topmost || entry.boundingClientRect.top < topmost.top) {
-              topmost = { id, top: entry.boundingClientRect.top };
-            }
-          }
-          if (topmost) {
-            setActiveId(topmost.id);
-          }
-        } else {
-          // No heading visible: find the last heading that scrolled past the top
-          const containerRect = container.getBoundingClientRect();
-          let lastPassedId: string | null = null;
-
-          for (const el of headingElements) {
-            const rect = el.getBoundingClientRect();
-            if (rect.top < containerRect.top + 10) {
-              lastPassedId = el.id;
-            }
-          }
-
-          if (lastPassedId) {
-            setActiveId(lastPassedId);
-          }
-        }
-      },
-      {
-        root: container,
-        rootMargin: "0px 0px -70% 0px",
-        threshold: [0, 1],
       }
-    );
 
-    for (const el of headingElements) {
-      observer.observe(el);
+      // If nothing has scrolled past yet, highlight the first heading
+      if (!active && headingElements.length > 0) {
+        active = (headingElements[0] as HTMLElement).id;
+      }
+
+      setActiveId(active);
     }
 
-    // Set initial active heading (first heading)
-    if (headingElements.length > 0) {
-      setActiveId(headingElements[0].id);
+    function onScroll() {
+      if (!ticking) {
+        ticking = true;
+        requestAnimationFrame(update);
+      }
     }
+
+    // Set initial state
+    update();
+
+    container.addEventListener("scroll", onScroll, { passive: true });
+
+    cleanupFn = () => {
+      container.removeEventListener("scroll", onScroll);
+    };
   }
 
   function disconnect() {
-    if (observer) {
-      observer.disconnect();
-      observer = null;
+    if (cleanupFn) {
+      cleanupFn();
+      cleanupFn = null;
     }
   }
 
