@@ -712,6 +712,19 @@ const App: Component = () => {
         returnToPreview();
         return;
       }
+      // Return from buffer mode (clipboard, stdin, etc.)
+      if (viewMode() === "buffer") {
+        e.preventDefault();
+        bufferManager.clear();
+        if (tabStore.tabCount() > 0) {
+          setViewMode("preview");
+        } else if (dirPath()) {
+          setViewMode("file-list");
+        } else {
+          setViewMode("demo");
+        }
+        return;
+      }
       // Return from file-list view to active tab
       if (viewMode() === "file-list" && tabStore.tabCount() > 0) {
         e.preventDefault();
@@ -984,12 +997,6 @@ const App: Component = () => {
       scrollSyncRef?.syncToLine(pos.line);
     };
 
-    const handleSplitScroll = () => {
-      // Skip manual-scroll detection during programmatic scrolls
-      if (scrollSyncRef?.isProgrammaticScroll()) return;
-      scrollSyncRef?.notifyManualScroll();
-    };
-
     // Initialize scroll sync after preview mounts
     const initScrollSync = (el: HTMLDivElement) => {
       splitPreviewRef = el;
@@ -1025,7 +1032,6 @@ const App: Component = () => {
               <Preview
                 html={html()}
                 ref={initScrollSync}
-                onScroll={handleSplitScroll}
               />
             }
           />
