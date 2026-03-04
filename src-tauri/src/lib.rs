@@ -13,6 +13,16 @@ use window_presets::{PeekConfig, FULL_SIZE, PEEK_MIN_SIZE, resolve_preset};
 #[derive(Debug, Default)]
 pub struct WindowModeState(pub Mutex<String>);
 
+/// Stores CLI arguments so the frontend can pull them after initialization.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct CliArgsData {
+    pub file: Option<String>,
+    pub clipboard: bool,
+    pub dir: Option<String>,
+}
+
+pub struct CliArgsState(pub Mutex<Option<CliArgsData>>);
+
 /// Determine PeekConfig from CLI args and stdin state.
 /// `screen_width` and `screen_height` are used for the "half" preset.
 fn resolve_peek_config(matches: &tauri_plugin_cli::Matches, screen_width: f64, screen_height: f64) -> PeekConfig {
@@ -152,6 +162,7 @@ pub fn run() {
             content: stdin_content,
         })
         .manage(WindowModeState::default())
+        .manage(CliArgsState(Mutex::new(None)))
         .manage(watcher::FileWatcherState::default())
         .invoke_handler(tauri::generate_handler![
             commands::read_file,
@@ -164,6 +175,7 @@ pub fn run() {
             commands::load_preference,
             commands::promote_to_full,
             commands::get_window_mode,
+            commands::get_cli_args,
             commands::start_file_watch,
             commands::stop_file_watch,
         ])
@@ -229,39 +241,53 @@ pub fn run() {
                 *mode = mode_str.to_string();
             }
 
-            // Create the window FIRST so the frontend exists to receive events
+            // Create the window
             if let Err(e) = create_window(app, &peek_config) {
                 eprintln!("Fatal: failed to create window: {}", e);
             }
 
-            // Emit window mode AFTER window creation so the frontend can receive it
-            let _ = app.emit("window-mode", mode_str);
+            // Resolve file path and store CLI args for frontend to pull via invoke
+            let resolved_file = file_path.as_ref().map(|path| {
+                let p = PathBuf::from(path);
+                std::fs::canonicalize(&p)
+                    .map(|c| c.to_string_lossy().to_string())
+                    .unwrap_or_else(|_| path.clone())
+            });
 
-            // Emit CLI args to frontend
-            let mut cli_data = serde_json::Map::new();
+            let resolved_dir = if file_path.is_none() {
+                // Check if resolved_file is actually a directory
+                std::env::current_dir()
+                    .ok()
+                    .map(|c| c.to_string_lossy().to_string())
+            } else {
+                // Check if the resolved path is a directory
+                resolved_file.as_ref().and_then(|f| {
+                    let p = PathBuf::from(f);
+                    if p.is_dir() {
+                        Some(f.clone())
+                    } else {
+                        None
+                    }
+                })
+            };
 
-            if let Some(ref path) = file_path {
-                resolve_and_emit(app, path);
-                cli_data.insert(
-                    "file".to_string(),
-                    serde_json::Value::String(path.clone()),
-                );
-            }
+            // If the resolved path was a directory, clear the file
+            let final_file = if resolved_dir.is_some() && file_path.is_some() {
+                None
+            } else {
+                resolved_file
+            };
 
-            if clipboard_flag {
-                cli_data.insert(
-                    "clipboard".to_string(),
-                    serde_json::Value::Bool(true),
-                );
-            }
+            let cli_args_data = CliArgsData {
+                file: final_file,
+                clipboard: clipboard_flag,
+                dir: resolved_dir,
+            };
 
-            let _ = app.emit("cli-args", serde_json::Value::Object(cli_data));
-
-            // No argument: open current directory listing
-            if file_path.is_none() {
-                if let Ok(cwd) = std::env::current_dir() {
-                    let _ = app.emit("cli-open-dir", cwd.to_string_lossy().to_string());
-                }
+            {
+                let state = app.state::<CliArgsState>();
+                let mut args = state.0.lock().expect("cli args lock poisoned");
+                *args = Some(cli_args_data);
             }
 
             Ok(())

@@ -321,10 +321,41 @@ const App: Component = () => {
     }
     setModeReady(true);
 
-    // 2. Setup Tauri event listeners
+    // 2. Setup Tauri event listeners (for drag-drop, single-instance, etc.)
     await setupTauriListeners();
 
-    // 3. Show window once the frontend is ready
+    // 3. Pull CLI args from backend (avoids race condition with events)
+    try {
+      const args = await invoke<{ file?: string; clipboard?: boolean; dir?: string } | null>("get_cli_args");
+      if (args) {
+        if (args.file) {
+          await openFileInTab(args.file);
+        } else if (args.clipboard) {
+          const result = await resolveInputSource({ clipboard: true });
+          if (result) {
+            initialInputResolved = true;
+            displayBufferContent(result);
+          }
+        } else if (args.dir) {
+          setDirPath(args.dir);
+          try {
+            const files = await invoke<MdFileEntry[]>("list_md_files", { dirPath: args.dir });
+            setFileList(files);
+            if (tabStore.tabCount() === 0) {
+              setViewMode("file-list");
+            }
+          } catch (err) {
+            console.error("Failed to list md files:", err);
+            setFileList([]);
+            setViewMode("file-list");
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Failed to get CLI args:", err);
+    }
+
+    // 4. Show window once the frontend is ready
     getCurrentWindow().show();
   });
 
