@@ -17,9 +17,13 @@ interface KeySequenceResult {
 function parseKeySequence(keys: string[]): KeySequenceResult {
   if (keys.length === 0) return { action: null };
 
-  // Single key: G
-  if (keys.length === 1 && keys[0] === "G") {
-    return { action: "scrollToBottom" };
+  // Single keys
+  if (keys.length === 1) {
+    switch (keys[0]) {
+      case "j": return { action: "scrollDown" };
+      case "k": return { action: "scrollUp" };
+      case "G": return { action: "scrollToBottom" };
+    }
   }
 
   // Two-key sequences
@@ -41,6 +45,14 @@ function parseKeySequence(keys: string[]): KeySequenceResult {
 }
 
 describe("Vim key sequence parsing", () => {
+  it("recognizes j for scroll down", () => {
+    expect(parseKeySequence(["j"])).toEqual({ action: "scrollDown" });
+  });
+
+  it("recognizes k for scroll up", () => {
+    expect(parseKeySequence(["k"])).toEqual({ action: "scrollUp" });
+  });
+
   it("recognizes G for scroll to bottom", () => {
     expect(parseKeySequence(["G"])).toEqual({ action: "scrollToBottom" });
   });
