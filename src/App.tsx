@@ -106,9 +106,9 @@ const App: Component = () => {
   let syncEngineRef: SyncEngineInstance | null = null;
   let returningToPreview = false;
 
-  // Preview container ref
-  let previewRef: HTMLDivElement | undefined;
-  const getPreviewRef = () => previewRef;
+  // Preview container ref (signal to trigger observer re-attachment on mount)
+  const [previewRef, setPreviewRef] = createSignal<HTMLDivElement | undefined>();
+  const getPreviewRef = previewRef;
 
   // Derived data
   const headings = createMemo(() => extractHeadings(markdown()));
@@ -470,16 +470,18 @@ const App: Component = () => {
   let previousTabId: string | null = null;
   createEffect(() => {
     const currentId = tabStore.activeTabId();
-    if (previousTabId && previousTabId !== currentId && previewRef) {
-      tabStore.saveScrollPosition(previousTabId, previewRef.scrollTop);
+    const ref = previewRef();
+    if (previousTabId && previousTabId !== currentId && ref) {
+      tabStore.saveScrollPosition(previousTabId, ref.scrollTop);
     }
     previousTabId = currentId;
 
     const tab = tabStore.activeTab();
-    if (tab && previewRef) {
+    if (tab && ref) {
       requestAnimationFrame(() => {
-        if (previewRef) {
-          previewRef.scrollTop = tab.scrollPosition;
+        const el = previewRef();
+        if (el) {
+          el.scrollTop = tab.scrollPosition;
         }
       });
     }
@@ -549,15 +551,16 @@ const App: Component = () => {
     setHtml(result);
   });
 
-  // Setup observers when preview HTML changes
+  // Setup observers when preview HTML changes or preview container mounts
   createEffect(() => {
     const _html = html(); // track
-    if (!previewRef) return;
+    const ref = previewRef(); // track
+    if (!ref) return;
 
     requestAnimationFrame(() => {
-      if (previewRef) {
-        observe(previewRef);
-        readingProgress.attach(previewRef);
+      if (ref) {
+        observe(ref);
+        readingProgress.attach(ref);
       }
     });
   });
@@ -763,7 +766,7 @@ const App: Component = () => {
           />
           <Preview
             html={html()}
-            ref={(el) => (previewRef = el)}
+            ref={setPreviewRef}
           />
         </div>
       </div>
@@ -923,7 +926,7 @@ const App: Component = () => {
                 />
                 <Preview
                   html={html()}
-                  ref={(el) => (previewRef = el)}
+                  ref={setPreviewRef}
                 />
               </div>
             </Match>

@@ -14,18 +14,10 @@ export function useActiveHeading() {
 
   /**
    * Start tracking heading elements within the given scroll container.
+   * Re-queries heading elements on every scroll to handle DOM changes.
    */
   function observe(container: HTMLElement) {
     disconnect();
-
-    const headingElements = container.querySelectorAll(
-      "h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]"
-    );
-
-    if (headingElements.length === 0) {
-      setActiveId(null);
-      return;
-    }
 
     let ticking = false;
     let rafId: number | null = null;
@@ -33,6 +25,16 @@ export function useActiveHeading() {
     function update() {
       ticking = false;
       rafId = null;
+
+      // Re-query headings each time to handle innerHTML updates
+      const headingElements = container.querySelectorAll(
+        "h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]"
+      );
+
+      if (headingElements.length === 0) {
+        setActiveId(null);
+        return;
+      }
 
       const containerTop = container.getBoundingClientRect().top;
       // A heading is "active" when its top edge is at or above this
@@ -49,7 +51,7 @@ export function useActiveHeading() {
       }
 
       // If nothing has scrolled past yet, highlight the first heading
-      if (!active && headingElements.length > 0) {
+      if (!active) {
         active = (headingElements[0] as HTMLElement).id;
       }
 
@@ -66,6 +68,8 @@ export function useActiveHeading() {
     // Set initial state
     update();
 
+    // Always attach the scroll listener even if no headings found yet;
+    // headings may appear after innerHTML updates.
     container.addEventListener("scroll", onScroll, { passive: true });
 
     cleanupFn = () => {
