@@ -7,10 +7,11 @@
  * - isDirty indicator (dot)
  * - Horizontal scroll overflow
  * - "+" button to create untitled tabs
+ * - Drag & drop tab reordering (pointer events)
  * - Dark theme styling
  */
 
-import { For, Show, createSignal, type Component } from "solid-js";
+import { For, Show, createSignal, onCleanup, type Component } from "solid-js";
 import type { Tab } from "../lib/tabStore";
 import type { Accessor } from "solid-js";
 
@@ -28,8 +29,64 @@ interface TabBarProps {
 }
 
 const TabBar: Component<TabBarProps> = (props) => {
-  const [dragIndex, setDragIndex] = createSignal<number | null>(null);
-  const [dropIndex, setDropIndex] = createSignal<number | null>(null);
+  const [dragFromIndex, setDragFromIndex] = createSignal<number | null>(null);
+  const [dropTargetIndex, setDropTargetIndex] = createSignal<number | null>(null);
+  let isDragging = false;
+  let startX = 0;
+  const DRAG_THRESHOLD = 5;
+  /** Map of tab index → DOM element for hit-testing */
+  const tabElements = new Map<number, HTMLButtonElement>();
+
+  function handlePointerDown(e: PointerEvent, index: number) {
+    // Only left button, ignore close button clicks
+    if (e.button !== 0) return;
+    startX = e.clientX;
+    isDragging = false;
+    setDragFromIndex(index);
+
+    const onPointerMove = (ev: PointerEvent) => {
+      const dx = Math.abs(ev.clientX - startX);
+      if (!isDragging && dx > DRAG_THRESHOLD) {
+        isDragging = true;
+      }
+      if (isDragging) {
+        // Hit-test: find which tab element the pointer is over
+        let found: number | null = null;
+        for (const [idx, el] of tabElements) {
+          const rect = el.getBoundingClientRect();
+          if (ev.clientX >= rect.left && ev.clientX <= rect.right) {
+            found = idx;
+            break;
+          }
+        }
+        setDropTargetIndex(found !== null && found !== dragFromIndex() ? found : null);
+      }
+    };
+
+    const onPointerUp = () => {
+      document.removeEventListener("pointermove", onPointerMove);
+      document.removeEventListener("pointerup", onPointerUp);
+
+      if (isDragging) {
+        const from = dragFromIndex();
+        const to = dropTargetIndex();
+        if (from !== null && to !== null && from !== to) {
+          props.onTabMove?.(from, to);
+        }
+      }
+
+      isDragging = false;
+      setDragFromIndex(null);
+      setDropTargetIndex(null);
+    };
+
+    document.addEventListener("pointermove", onPointerMove);
+    document.addEventListener("pointerup", onPointerUp);
+  }
+
+  onCleanup(() => {
+    tabElements.clear();
+  });
 
   return (
     <div class="flex h-9 flex-shrink-0 items-end overflow-x-auto bg-zinc-900 border-b border-zinc-700/50 scrollbar-hide">
@@ -57,50 +114,35 @@ const TabBar: Component<TabBarProps> = (props) => {
       <For each={props.tabs()}>
         {(tab, index) => {
           const isActive = () => props.activeTabId() === tab.id;
+          const isBeingDragged = () => dragFromIndex() === index() && isDragging;
+          const isDropTarget = () => dropTargetIndex() === index();
 
           return (
             <button
+              ref={(el) => {
+                tabElements.set(index(), el);
+                onCleanup(() => tabElements.delete(index()));
+              }}
               class="group relative flex h-8 items-center gap-1.5 border-r border-zinc-700/30 px-3 text-xs transition-colors select-none whitespace-nowrap"
               classList={{
                 "bg-zinc-800 text-zinc-200": isActive(),
                 "bg-zinc-900 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50": !isActive(),
-                "opacity-50": dragIndex() === index(),
+                "opacity-40": isBeingDragged(),
               }}
-              draggable={true}
-              onDragStart={(e) => {
-                setDragIndex(index());
-                e.dataTransfer!.effectAllowed = "move";
-                e.dataTransfer!.setData("text/plain", String(index()));
-              }}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.dataTransfer!.dropEffect = "move";
-                setDropIndex(index());
-              }}
-              onDragLeave={() => {
-                setDropIndex(null);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                const from = dragIndex();
-                const to = index();
-                if (from !== null && from !== to) {
-                  props.onTabMove?.(from, to);
+              onPointerDown={(e) => handlePointerDown(e, index())}
+              onClick={() => {
+                // Only trigger click if not dragging
+                if (!isDragging) {
+                  props.onTabClick(tab.id);
                 }
-                setDragIndex(null);
-                setDropIndex(null);
               }}
-              onDragEnd={() => {
-                setDragIndex(null);
-                setDropIndex(null);
-              }}
-              onClick={() => props.onTabClick(tab.id)}
               title={tab.isUntitled ? tab.fileName : tab.filePath}
             >
-              {/* Drop indicator */}
-              <Show when={dropIndex() === index() && dragIndex() !== null && dragIndex() !== index()}>
-                <div class="absolute top-0 bottom-0 left-0 w-0.5 bg-blue-500" />
+              {/* Drop indicator line */}
+              <Show when={isDropTarget()}>
+                <div class="absolute top-0 bottom-0 left-0 w-0.5 bg-blue-500 z-10" />
               </Show>
+
               {/* Dirty indicator dot */}
               <Show when={tab.isDirty}>
                 <span class="h-2 w-2 rounded-full bg-amber-400 flex-shrink-0" />
