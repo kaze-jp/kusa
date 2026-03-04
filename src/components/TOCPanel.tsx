@@ -62,6 +62,7 @@ const TOCPanel: Component<TOCPanelProps> = (props) => {
         when={props.isVisible}
         fallback={
           <button
+            type="button"
             class="toc-collapsed-toggle"
             onClick={() => props.onToggle()}
             aria-label="Show table of contents"
@@ -82,6 +83,7 @@ const TOCPanel: Component<TOCPanelProps> = (props) => {
           <div class="toc-header">
             <span class="toc-title">Contents</span>
             <button
+              type="button"
               class="toc-toggle-btn"
               onClick={() => props.onToggle()}
               aria-label="Hide table of contents"

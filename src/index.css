@@ -222,6 +222,12 @@ body {
   color: var(--color-text);
 }
 
+.toc-toggle-btn:focus-visible,
+.toc-collapsed-toggle:focus-visible {
+  outline: 2px solid var(--color-toc-active);
+  outline-offset: 2px;
+}
+
 .toc-collapsed-toggle {
   display: flex;
   align-items: center;
