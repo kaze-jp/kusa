@@ -15,6 +15,7 @@
         "@tauri-apps/api": "^2.10.1",
         "@tauri-apps/plugin-cli": "^2.4.1",
         "@tauri-apps/plugin-clipboard-manager": "^2.3.2",
+        "@tauri-apps/plugin-dialog": "^2.6.0",
         "@tauri-apps/plugin-window-state": "^2.4.1",
         "rehype-external-links": "^3.0.0",
         "rehype-pretty-code": "^0.14.3",
@@ -334,6 +335,8 @@
     "@tauri-apps/plugin-cli": ["@tauri-apps/plugin-cli@2.4.1", "", { "dependencies": { "@tauri-apps/api": "2.10.1" } }, "sha512-8JXofQFI5cmiGolh1PlU4hzE2YJgrgB1lyaztyBYiiMCy13luVxBXaXChYPeqMkUo46J1UadxvYdjRjj0E8zaw=="],
 
     "@tauri-apps/plugin-clipboard-manager": ["@tauri-apps/plugin-clipboard-manager@2.3.2", "", { "dependencies": { "@tauri-apps/api": "2.10.1" } }, "sha512-CUlb5Hqi2oZbcZf4VUyUH53XWPPdtpw43EUpCza5HWZJwxEoDowFzNUDt1tRUXA8Uq+XPn17Ysfptip33sG4eQ=="],
+
+    "@tauri-apps/plugin-dialog": ["@tauri-apps/plugin-dialog@2.6.0", "", { "dependencies": { "@tauri-apps/api": "^2.8.0" } }, "sha512-q4Uq3eY87TdcYzXACiYSPhmpBA76shgmQswGkSVio4C82Sz2W4iehe9TnKYwbq7weHiL88Yw19XZm7v28+Micg=="],
 
     "@tauri-apps/plugin-window-state": ["@tauri-apps/plugin-window-state@2.4.1", "", { "dependencies": { "@tauri-apps/api": "2.10.1" } }, "sha512-OuvdrzyY8Q5Dbzpj+GcrnV1iCeoZbcFdzMjanZMMcAEUNy/6PH5pxZPXpaZLOR7whlzXiuzx0L9EKZbH7zpdRw=="],
 

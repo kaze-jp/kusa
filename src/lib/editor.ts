@@ -171,6 +171,49 @@ export function createCMEditor(
 
   // Build extensions
   const extensions = [
+    // Override Ctrl+D/U before vim processes them to prevent wrap-around at boundaries
+    EditorView.domEventHandlers({
+      keydown(event, view) {
+        if (!event.ctrlKey) return false;
+        if (event.key !== "d" && event.key !== "u") return false;
+
+        event.preventDefault();
+        const doc = view.state.doc;
+        const sel = view.state.selection.main;
+        const currentLine = doc.lineAt(sel.head);
+        const visibleLines = Math.max(
+          1,
+          Math.floor(view.dom.clientHeight / view.defaultLineHeight / 2),
+        );
+
+        if (event.key === "d") {
+          // Half-page down: clamp to last line
+          const targetLineNum = Math.min(
+            currentLine.number + visibleLines,
+            doc.lines,
+          );
+          const targetLine = doc.line(targetLineNum);
+          const col = Math.min(sel.head - currentLine.from, targetLine.length);
+          view.dispatch({
+            selection: { anchor: targetLine.from + col },
+            scrollIntoView: true,
+          });
+        } else {
+          // Half-page up: clamp to first line
+          const targetLineNum = Math.max(
+            currentLine.number - visibleLines,
+            1,
+          );
+          const targetLine = doc.line(targetLineNum);
+          const col = Math.min(sel.head - currentLine.from, targetLine.length);
+          view.dispatch({
+            selection: { anchor: targetLine.from + col },
+            scrollIntoView: true,
+          });
+        }
+        return true;
+      },
+    }),
     vim(),
     lineNumbers(),
     highlightActiveLine(),

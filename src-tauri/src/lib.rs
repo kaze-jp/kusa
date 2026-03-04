@@ -195,6 +195,7 @@ pub fn run() {
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_cli::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(move |app| {
             // Get actual monitor dimensions for the "half" preset.
             // Falls back to 1920x1080 if the primary monitor cannot be detected.
