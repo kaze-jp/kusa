@@ -55,7 +55,7 @@ When modifying existing systems:
 | Markdown | unified/remark | | |
 | Styling | Tailwind CSS | | |
 | Backend | Rust (Tauri v2) | | |
-| Build | pnpm + Vite | | |
+| Build | bun + Vite | | |
 
 ## System Flows
 

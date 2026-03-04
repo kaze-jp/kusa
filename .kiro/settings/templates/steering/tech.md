@@ -35,12 +35,12 @@
 
 ### Common Commands
 ```bash
-# Dev: pnpm tauri dev
-# Build: pnpm tauri build
-# Test (frontend): pnpm test
+# Dev: bun tauri dev
+# Build: bun tauri build
+# Test (frontend): bun test
 # Test (Rust): cd src-tauri && cargo test
-# Lint: pnpm lint
-# Type check: pnpm typecheck
+# Lint: bun lint
+# Type check: bun typecheck
 ```
 
 ## Key Technical Decisions

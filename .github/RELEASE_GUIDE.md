@@ -136,5 +136,5 @@ This means the app is not code signed. Either:
 ### Build fails on CI
 
 - Check that Rust toolchain version is compatible
-- Verify `pnpm install --frozen-lockfile` succeeds (lockfile in sync)
+- Verify `bun install --frozen-lockfile` succeeds (lockfile in sync)
 - Check `cargo check` passes locally before pushing

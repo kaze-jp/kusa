@@ -100,7 +100,7 @@ graph TB
 | Markdown | unified 11 / remark ecosystem | リアルタイムプレビュー変換 | 既存 |
 | Styling | Tailwind CSS 3.x | Split layout、リサイザー | 既存 |
 | Backend | Rust / Tauri v2.10 | ファイル書き込み IPC | 最小限の追加 |
-| Build | pnpm / Vite | 遅延ロード、コード分割 | dynamic import |
+| Build | bun / Vite | 遅延ロード、コード分割 | dynamic import |
 
 ## System Flows
 

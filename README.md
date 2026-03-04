@@ -29,13 +29,13 @@ brew install gene/tap/kusa
 
 ### Build from source
 
-Requirements: Rust, Node.js 22+, pnpm
+Requirements: Rust, [bun](https://bun.sh/)
 
 ```sh
 git clone https://github.com/kaze-jp/kusa.git
 cd kusa
-pnpm install
-pnpm tauri build
+bun install
+bun tauri build
 ```
 
 The built `.dmg` will be in `src-tauri/target/release/bundle/dmg/`.
@@ -76,8 +76,8 @@ kusa https://raw.githubusercontent.com/user/repo/main/README.md
 ## Development
 
 ```sh
-pnpm install
-pnpm tauri dev
+bun install
+bun tauri dev
 ```
 
 ## License

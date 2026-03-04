@@ -21,5 +21,5 @@
 - [x] Keep UI chrome (TOC, status bar, etc.) at fixed size
 
 ## Task 4: Type Check and Validate
-- [x] Run `pnpm tsc` to verify no type errors
+- [x] Run `bun tsc` to verify no type errors
 - [x] Verify zoom keyboard shortcuts don't conflict with existing shortcuts
