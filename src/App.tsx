@@ -749,16 +749,17 @@ const App: Component = () => {
       return;
     }
 
-    // Ctrl+E: Toggle Split mode / return to preview (disabled during buffer split)
+    // Ctrl+E: In split mode, let editor handle vim scroll (Ctrl+E/Y).
+    //         In preview mode, toggle to split mode.
     if (e.ctrlKey && !e.metaKey && e.key === "e") {
-      e.preventDefault();
       if (viewMode() !== "preview" || bufferManager.state.isBufferMode()) return;
       if (bufferSplit.state().active) return; // Req 4.1
-      if (editMode() === "preview") {
-        enterEditMode("split");
-      } else {
-        returnToPreview();
+      if (editMode() === "split") {
+        // Let the event propagate to CodeMirror's Ctrl+E handler
+        return;
       }
+      e.preventDefault();
+      enterEditMode("split");
       return;
     }
 

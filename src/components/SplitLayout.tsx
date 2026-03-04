@@ -96,7 +96,7 @@ export default function SplitLayout(props: SplitLayoutProps) {
 
       {/* Right pane (preview) */}
       <div
-        class="h-full overflow-hidden"
+        class="flex h-full flex-col overflow-hidden"
         style={{ width: getRightWidth(), "flex-shrink": "0" }}
       >
         {props.right}

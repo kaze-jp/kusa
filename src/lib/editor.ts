@@ -176,10 +176,47 @@ export function createCMEditor(
 
   // Build extensions
   const extensions = [
-    // Override Ctrl+D/U before vim processes them to prevent wrap-around at boundaries
+    // Override Ctrl+E/Y/D/U before vim processes them
     EditorView.domEventHandlers({
       keydown(event, view) {
         if (!event.ctrlKey) return false;
+
+        // Ctrl+E: scroll viewport down one line (vim-style)
+        // Ctrl+Y: scroll viewport up one line (vim-style)
+        if (event.key === "e" || event.key === "y") {
+          event.preventDefault();
+          const lineHeight = view.defaultLineHeight;
+          const direction = event.key === "e" ? 1 : -1;
+          view.scrollDOM.scrollBy({ top: lineHeight * direction });
+
+          // Vim behavior: keep cursor within visible area
+          const doc = view.state.doc;
+          const sel = view.state.selection.main;
+          const scrollTop = view.scrollDOM.scrollTop;
+          const viewportHeight = view.scrollDOM.clientHeight;
+          const cursorCoords = view.coordsAtPos(sel.head);
+
+          if (cursorCoords) {
+            const editorRect = view.scrollDOM.getBoundingClientRect();
+            const cursorY = cursorCoords.top - editorRect.top;
+
+            if (cursorY < 0) {
+              // Cursor above viewport — move to first visible line
+              const topBlock = view.lineBlockAtHeight(scrollTop);
+              const topLine = doc.lineAt(topBlock.from);
+              const col = Math.min(sel.head - doc.lineAt(sel.head).from, topLine.length);
+              view.dispatch({ selection: { anchor: topLine.from + col } });
+            } else if (cursorY + lineHeight > viewportHeight) {
+              // Cursor below viewport — move to last visible line
+              const botBlock = view.lineBlockAtHeight(scrollTop + viewportHeight - lineHeight);
+              const botLine = doc.lineAt(botBlock.from);
+              const col = Math.min(sel.head - doc.lineAt(sel.head).from, botLine.length);
+              view.dispatch({ selection: { anchor: botLine.from + col } });
+            }
+          }
+          return true;
+        }
+
         if (event.key !== "d" && event.key !== "u") return false;
 
         event.preventDefault();
