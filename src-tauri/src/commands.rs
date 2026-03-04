@@ -418,6 +418,16 @@ pub fn load_preference(key: String) -> Result<Option<String>, String> {
 
 // --- New commands for lightweight-access ---
 
+/// Return CLI arguments stored during setup.
+/// The frontend calls this after listener setup to avoid the race condition
+/// where events were emitted before the WebView was ready.
+#[tauri::command]
+pub fn get_cli_args(
+    state: tauri::State<'_, crate::CliArgsState>,
+) -> Option<crate::CliArgsData> {
+    state.0.lock().ok().and_then(|args| args.clone())
+}
+
 /// Return the current window mode ("peek" or "full").
 /// This allows the frontend to query the mode reliably instead of
 /// depending on a race-prone event that may arrive before the WebView is ready.
