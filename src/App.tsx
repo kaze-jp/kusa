@@ -13,6 +13,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { save, confirm } from "@tauri-apps/plugin-dialog";
 import { processMarkdown, extractHeadings } from "./lib/markdown";
 import { useActiveHeading } from "./lib/useActiveHeading";
 import { useReadingProgress } from "./lib/useReadingProgress";
@@ -28,6 +29,7 @@ import { createFileWatcher } from "./lib/fileWatcher";
 import { createEditorLazyLoader, type CMEditorInstance } from "./lib/editor";
 import { createSyncEngine, type SyncEngineInstance } from "./lib/sync";
 import type { InputContent, CliArgs } from "./lib/types";
+import type { Tab } from "./lib/tabStore";
 import Preview from "./components/Preview";
 import TOCPanel from "./components/TOCPanel";
 import HeadingPicker from "./components/HeadingPicker";
@@ -272,11 +274,30 @@ const App: Component = () => {
     openFileInTab(path);
   }
 
+  /** Create a new untitled tab */
+  function handleNewTab() {
+    const id = tabStore.createUntitledTab();
+    if (id) {
+      setViewMode("preview");
+      setMarkdown("");
+      setHtml("");
+      updateWindowTitle({ source: "file", content: "", title: tabStore.activeTab()?.fileName ?? "Untitled", filePath: null });
+    }
+  }
+
   /** Handle tab close */
   async function handleTabClose(id: string) {
+    // Check if closing a dirty untitled tab — confirm discard
+    const tab = tabStore.tabs().find((t) => t.id === id);
+    if (tab?.isUntitled && tab.isDirty) {
+      const confirmed = await confirm("Discard unsaved changes?", { title: "kusa", kind: "warning" });
+      if (!confirmed) return;
+    }
+
     // If closing the active tab while in edit/split mode, save and clean up
     if (editMode() !== "preview" && tabStore.activeTabId() === id) {
-      if (isDirty()) {
+      // Only force save if it's a file tab (not untitled)
+      if (isDirty() && !tab?.isUntitled) {
         await syncEngineRef?.forceSave();
       }
       syncEngineRef?.destroy();
@@ -331,13 +352,14 @@ const App: Component = () => {
   // Edit mode management
   // -----------------------------------------------------------------------
 
-  /** Create a SyncEngine instance for the given file */
-  function createSyncEngineForFile(filePath: string, initialContent: string): SyncEngineInstance {
+  /** Create a SyncEngine instance for the given tab */
+  function createSyncEngineForTab(tab: Tab, initialContent: string): SyncEngineInstance {
     return createSyncEngine({
       previewDebounceMs: 250,
       autoSaveDebounceMs: 800,
-      filePath,
+      filePath: tab.filePath,
       initialContent,
+      skipAutoSave: tab.isUntitled,
       onPreviewUpdate: (newHtml) => setHtml(newHtml),
       onSaveComplete: () => {
         setSaveNotification({ text: "Saved", type: "success" });
@@ -370,12 +392,12 @@ const App: Component = () => {
       }
     }
 
-    // Create sync engine for the active file
+    // Create sync engine for the active tab
     const tab = tabStore.activeTab();
     if (!tab) return;
 
     syncEngineRef?.destroy();
-    syncEngineRef = createSyncEngineForFile(tab.filePath, markdown());
+    syncEngineRef = createSyncEngineForTab(tab, markdown());
 
     setEditMode(mode);
   }
@@ -389,8 +411,14 @@ const App: Component = () => {
       const content = editorRef?.getContent() ?? markdown();
 
       // Save if dirty or force save requested (:wq)
+      const tab = tabStore.activeTab();
       if (forceSave || isDirty()) {
-        await syncEngineRef?.forceSave();
+        if (tab?.isUntitled) {
+          // For untitled tabs, trigger Save As on :wq
+          await handleSaveAs(tab);
+        } else {
+          await syncEngineRef?.forceSave();
+        }
       }
 
       // Clean up sync engine
@@ -401,11 +429,11 @@ const App: Component = () => {
       // Update markdown for preview rendering
       setMarkdown(content);
 
-      // Update tab content
-      const tab = tabStore.activeTab();
-      if (tab) {
-        tabStore.updateTabContent(tab.id, content);
-        tabStore.markClean(tab.id);
+      // Update tab content (re-read active tab since it may have been promoted)
+      const currentTab = tabStore.activeTab();
+      if (currentTab) {
+        tabStore.updateTabContent(currentTab.id, content);
+        tabStore.markClean(currentTab.id);
       }
 
       // Reset editor state
@@ -425,9 +453,47 @@ const App: Component = () => {
     syncEngineRef?.handleContentChange(content);
   }
 
-  /** Handle :w command — force save */
-  function handleSave() {
+  /** Handle :w command — force save or Save As for untitled */
+  async function handleSave() {
+    const tab = tabStore.activeTab();
+    if (tab?.isUntitled) {
+      await handleSaveAs(tab);
+      return;
+    }
     syncEngineRef?.forceSave();
+  }
+
+  /** Save As dialog for untitled tabs */
+  async function handleSaveAs(tab: Tab) {
+    const filePath = await save({
+      filters: [{ name: "Markdown", extensions: ["md", "markdown", "txt"] }],
+    });
+    if (!filePath) return; // cancelled
+
+    const content = editorRef?.getContent() ?? tab.content;
+    try {
+      await invoke("write_file", { path: filePath, content });
+    } catch (e) {
+      setSaveNotification({ text: `Save failed: ${String(e)}`, type: "error" });
+      return;
+    }
+
+    const fileName = filePath.split(/[\\/]/).pop() || filePath;
+    tabStore.promoteToFile(tab.id, filePath, fileName);
+
+    // Recreate SyncEngine with full auto-save
+    syncEngineRef?.destroy();
+    const promoted = tabStore.activeTab();
+    if (promoted) {
+      syncEngineRef = createSyncEngineForTab(promoted, content);
+    }
+
+    // Start file watcher
+    await fileWatcher.watch(filePath);
+
+    updateWindowTitle({ source: "file", content, title: fileName, filePath });
+    setSaveNotification({ text: "Saved", type: "success" });
+    setIsDirty(false);
   }
 
   /** Handle :wq command — save and return to preview */
@@ -453,14 +519,16 @@ const App: Component = () => {
     const tab = tabStore.activeTab();
     if (tab) {
       setMarkdown(tab.content);
-      // Watch the active tab's file for external changes
-      fileWatcher.watch(tab.filePath).catch(() => {});
+      // Watch the active tab's file for external changes (skip for untitled)
+      if (!tab.isUntitled) {
+        fileWatcher.watch(tab.filePath).catch(() => {});
+      }
 
       // If in edit/split mode, update editor content and recreate sync engine
       if (editMode() !== "preview" && editorRef) {
         editorRef.setContent(tab.content);
         syncEngineRef?.destroy();
-        syncEngineRef = createSyncEngineForFile(tab.filePath, tab.content);
+        syncEngineRef = createSyncEngineForTab(tab, tab.content);
         setIsDirty(false);
       }
     }
@@ -849,12 +917,14 @@ const App: Component = () => {
   // Full mode content layout
   const FullContent = () => (
     <div class="flex h-full flex-col">
-      {/* Tab bar: shown when tabs exist */}
+      {/* Tab bar: always shown (includes + button) */}
       <TabBar
         tabs={tabStore.tabs}
         activeTabId={tabStore.activeTabId}
         onTabClick={(id) => tabStore.switchTab(id)}
         onTabClose={handleTabClose}
+        onNewTab={handleNewTab}
+        isMaxTabs={tabStore.tabCount() >= 20}
       />
 
       {/* Main content area */}

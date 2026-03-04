@@ -16,6 +16,7 @@
     "core:window:allow-set-focus",
     "cli:default",
     "window-state:default",
-    "clipboard-manager:allow-read-text"
+    "clipboard-manager:allow-read-text",
+    "dialog:default"
   ]
 }

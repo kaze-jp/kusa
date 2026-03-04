@@ -18,6 +18,7 @@ export interface SyncEngineConfig {
   autoSaveDebounceMs: number; // 500-1000ms recommended
   filePath: string;
   initialContent?: string; // seed buffer so :w before any edit won't blank the file
+  skipAutoSave?: boolean; // true for untitled buffers — preview only, no file writes
   onPreviewUpdate: (html: string) => void;
   onSaveComplete: () => void;
   onSaveError: (error: string) => void;
@@ -154,7 +155,9 @@ export function createSyncEngine(config: SyncEngineConfig): SyncEngineInstance {
     currentContent = content;
     setDirty(true);
     previewDebounce.call(content);
-    saveDebounce.call();
+    if (!config.skipAutoSave) {
+      saveDebounce.call();
+    }
   }
 
   function forcePreviewUpdate() {
