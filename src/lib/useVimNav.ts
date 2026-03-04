@@ -121,6 +121,31 @@ export function useVimNav(
     if (pickerOpen()) return;
 
     const key = e.key;
+    const container = getContainer();
+
+    // j/k line scroll
+    if (key === "j" && !pendingKey) {
+      e.preventDefault();
+      container?.scrollBy({ top: 60 });
+      return;
+    }
+    if (key === "k" && !pendingKey) {
+      e.preventDefault();
+      container?.scrollBy({ top: -60 });
+      return;
+    }
+
+    // Ctrl+D / Ctrl+U half-page scroll
+    if (e.ctrlKey && key === "d") {
+      e.preventDefault();
+      if (container) container.scrollBy({ top: container.clientHeight / 2 });
+      return;
+    }
+    if (e.ctrlKey && key === "u") {
+      e.preventDefault();
+      if (container) container.scrollBy({ top: -container.clientHeight / 2 });
+      return;
+    }
 
     // Single-key: G -> scroll to bottom
     if (key === "G" && !pendingKey) {
