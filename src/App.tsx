@@ -354,6 +354,8 @@ const App: Component = () => {
 
   /** Enter edit or split mode */
   async function enterEditMode(mode: "edit" | "split") {
+    // Guard: peek mode is read-only, no editor
+    if (isPeekMode()) return;
     // Guard: only allow when in file preview mode and editable
     if (viewMode() !== "preview") return;
     if (bufferManager.state.isBufferMode()) return;

@@ -51,9 +51,9 @@ const HintBar: Component<HintBarProps> = (props) => {
       <div class="flex items-center gap-4 text-zinc-400">
         <span>
           <kbd class="px-1.5 py-0.5 rounded bg-zinc-700 text-zinc-300 font-mono text-[10px]">
-            Esc
+            j/k
           </kbd>{" "}
-          閉じる
+          スクロール
         </span>
         <span>
           <kbd class="px-1.5 py-0.5 rounded bg-zinc-700 text-zinc-300 font-mono text-[10px]">
