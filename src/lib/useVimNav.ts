@@ -1,4 +1,5 @@
 import { createSignal, onCleanup } from "solid-js";
+import { isPeekMode } from "../stores/windowMode";
 import type { HeadingInfo } from "./markdown";
 
 const SEQUENCE_TIMEOUT = 500;
@@ -130,8 +131,8 @@ export function useVimNav(
     const key = e.key;
     const container = getContainer();
 
-    // i: Enter edit mode
-    if (key === "i" && !pendingKey && options?.onEnterEdit) {
+    // i: Enter edit mode (disabled in peek mode)
+    if (key === "i" && !pendingKey && options?.onEnterEdit && !isPeekMode()) {
       e.preventDefault();
       options.onEnterEdit();
       return;
