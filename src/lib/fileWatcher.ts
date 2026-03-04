@@ -56,40 +56,55 @@ export function createFileWatcher(
   async function setupListeners(): Promise<void> {
     if (changedUnlisten) return; // already set up
 
-    changedUnlisten = await listen<string>("file-changed", async (event) => {
-      if (destroyed) return;
-      const changedPath = event.payload;
+    // Register both listeners atomically — if the second fails, clean up the first
+    let newChangedUnlisten: UnlistenFn | null = null;
+    let newDeletedUnlisten: UnlistenFn | null = null;
 
-      // Only handle if it matches our current watch target
-      if (changedPath !== currentPath) return;
+    try {
+      newChangedUnlisten = await listen<string>("file-changed", async (event) => {
+        if (destroyed) return;
+        const changedPath = event.payload;
 
-      // Check for dirty conflict
-      if (config.isDirty()) {
-        const applyExternal = config.onConflict(changedPath);
-        if (!applyExternal) return; // user chose to keep local changes
-      }
+        // Only handle if it matches our current watch target
+        if (changedPath !== currentPath) return;
 
-      // Re-read the file and notify
-      try {
-        const content = await invoke<string>("read_file", {
-          path: changedPath,
-        });
-        if (!destroyed) {
-          config.onFileChanged(content, changedPath);
+        // Check for dirty conflict
+        if (config.isDirty()) {
+          const applyExternal = config.onConflict(changedPath);
+          if (!applyExternal) return; // user chose to keep local changes
         }
-      } catch (err) {
-        console.error("Failed to re-read changed file:", err);
-      }
-    });
 
-    deletedUnlisten = await listen<string>("file-deleted", (event) => {
-      if (destroyed) return;
-      const deletedPath = event.payload;
+        // Re-read the file and notify
+        try {
+          const content = await invoke<string>("read_file", {
+            path: changedPath,
+          });
+          if (!destroyed) {
+            config.onFileChanged(content, changedPath);
+          }
+        } catch (err) {
+          console.error("Failed to re-read changed file:", err);
+        }
+      });
 
-      if (deletedPath !== currentPath) return;
+      newDeletedUnlisten = await listen<string>("file-deleted", (event) => {
+        if (destroyed) return;
+        const deletedPath = event.payload;
 
-      config.onFileDeleted(deletedPath);
-    });
+        if (deletedPath !== currentPath) return;
+
+        config.onFileDeleted(deletedPath);
+      });
+
+      // Both succeeded — commit
+      changedUnlisten = newChangedUnlisten;
+      deletedUnlisten = newDeletedUnlisten;
+    } catch (err) {
+      // Roll back partial registration
+      if (newChangedUnlisten) newChangedUnlisten();
+      if (newDeletedUnlisten) newDeletedUnlisten();
+      throw err;
+    }
   }
 
   async function watch(path: string): Promise<void> {
@@ -107,12 +122,13 @@ export function createFileWatcher(
       }
     }
 
-    currentPath = path;
-
+    // Start the backend watcher, then update currentPath on success
     try {
       await invoke("start_file_watch", { path });
+      currentPath = path;
     } catch (err) {
       console.error("Failed to start file watch:", err);
+      throw err;
     }
   }
 

@@ -106,22 +106,31 @@ const App: Component = () => {
 
   // File watcher: auto-reload preview when file changes externally
   const fileWatcher = createFileWatcher({
-    onFileChanged(content, _path) {
+    onFileChanged(content, path) {
       setMarkdown(content);
+      // Also update the tab store so tab content stays in sync
+      const tab = tabStore.activeTab();
+      if (tab && tab.filePath === path) {
+        tabStore.updateTabContent(tab.id, content);
+        tabStore.markClean(tab.id);
+      }
       setFileNotification({ text: "File updated externally", type: "info" });
       setTimeout(() => setFileNotification(null), 3000);
     },
     onFileDeleted(path) {
       setFileNotification({
-        text: `File deleted: ${path.split("/").pop() ?? path}`,
+        text: `File deleted: ${path.split(/[\\/]/).pop() ?? path}`,
         type: "error",
       });
     },
     onConflict(_path) {
+      // When dirty, default to accepting external changes
+      // (future: show a user prompt dialog)
       return true;
     },
     isDirty() {
-      return false;
+      const tab = tabStore.activeTab();
+      return tab?.isDirty ?? false;
     },
   });
 
@@ -226,6 +235,8 @@ const App: Component = () => {
   function handleTabClose(id: string) {
     const hasRemaining = tabStore.closeTab(id);
     if (!hasRemaining) {
+      // No tabs remaining — stop watching
+      fileWatcher.unwatch();
       if (dirPath()) {
         setViewMode("file-list");
       } else {
@@ -271,6 +282,8 @@ const App: Component = () => {
     const tab = tabStore.activeTab();
     if (tab) {
       setMarkdown(tab.content);
+      // Watch the active tab's file for external changes
+      fileWatcher.watch(tab.filePath).catch(() => {});
     }
   });
 
