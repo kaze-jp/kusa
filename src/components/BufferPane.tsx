@@ -36,8 +36,12 @@ const BufferPane: Component<BufferPaneProps> = (props) => {
         <span class="truncate">{fileName()}</span>
       </div>
 
-      {/* Preview area */}
-      <div class="flex-1 min-h-0 overflow-auto">
+      {/* Scrollable preview area — this div is the scroll container for vim nav */}
+      <div
+        class="buffer-split-pane flex-1 min-h-0 overflow-auto"
+        ref={(el) => props.previewRef?.(el)}
+        style={{ "scrollbar-width": "thin", "scrollbar-color": "var(--color-scrollbar-thumb) var(--color-scrollbar-track)" }}
+      >
         <Show
           when={props.tabId}
           fallback={
@@ -46,7 +50,7 @@ const BufferPane: Component<BufferPaneProps> = (props) => {
             </div>
           }
         >
-          <Preview html={props.html} ref={props.previewRef} />
+          <Preview html={props.html} />
         </Show>
       </div>
     </div>

@@ -422,6 +422,12 @@ body {
   border-radius: 3px;
 }
 
+/* In buffer split panes, the parent div handles scrolling */
+.buffer-split-pane > .preview-container {
+  overflow-y: visible;
+  flex: unset;
+}
+
 /* ========================================
    Markdown Body (GFM Styling)
    ======================================== */

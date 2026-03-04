@@ -933,11 +933,18 @@ const App: Component = () => {
       return;
     }
 
-    // Cmd+Shift+V / Ctrl+Shift+V: Preview clipboard content
+    // Cmd+Shift+V / Ctrl+Shift+V: Open clipboard content as a tab
     if (isMeta && e.shiftKey && (e.key === "v" || e.key === "V")) {
       e.preventDefault();
       invoke<InputContent>("read_clipboard").then(
-        (content) => displayBufferContent(content),
+        (content) => {
+          const id = tabStore.createClipboardTab(content.content);
+          if (id) {
+            setViewMode("preview");
+            setMarkdown(content.content);
+            updateWindowTitle({ source: "clipboard", content: content.content, title: "clipboard", filePath: null });
+          }
+        },
         (err) => handleInputError(err),
       );
       return;

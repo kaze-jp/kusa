@@ -42,6 +42,8 @@ export interface TabStore {
   openTab(filePath: string, fileName: string, content: string): void;
   /** Create a new untitled tab with empty content. Returns tab id. */
   createUntitledTab(): string;
+  /** Create a new clipboard tab with pasted content. Returns tab id. */
+  createClipboardTab(content: string): string;
   /** Promote an untitled tab to a file tab */
   promoteToFile(id: string, filePath: string, fileName: string): void;
   /** Close a tab by id. Returns true if tabs remain, false if all closed. */
@@ -82,6 +84,9 @@ const MAX_TABS = 20;
 
 /** Module-level counter for untitled tabs (never reused) */
 let untitledCounter = 0;
+
+/** Module-level counter for clipboard tabs (never reused) */
+let clipboardCounter = 0;
 
 export function createTabStore(): TabStore {
   const [tabs, setTabs] = createSignal<Tab[]>([]);
@@ -150,6 +155,34 @@ export function createTabStore(): TabStore {
       filePath: "",
       fileName,
       content: "",
+      isDirty: false,
+      scrollPosition: 0,
+      isUntitled: true,
+    };
+
+    setTabs([...current, newTab]);
+    setActiveTabId(id);
+    return id;
+  }
+
+  function createClipboardTab(content: string): string {
+    const current = tabs();
+
+    // Check max tab limit
+    if (current.length >= MAX_TABS) {
+      console.warn(`Tab limit reached (${MAX_TABS}). Close a tab before opening a new one.`);
+      return "";
+    }
+
+    clipboardCounter++;
+    const id = `clipboard-${clipboardCounter}`;
+    const fileName = "clipboard";
+
+    const newTab: Tab = {
+      id,
+      filePath: "",
+      fileName,
+      content,
       isDirty: false,
       scrollPosition: 0,
       isUntitled: true,
@@ -272,6 +305,7 @@ export function createTabStore(): TabStore {
     activeTab,
     openTab,
     createUntitledTab,
+    createClipboardTab,
     promoteToFile,
     closeTab,
     switchTab,

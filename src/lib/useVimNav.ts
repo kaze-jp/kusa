@@ -133,6 +133,11 @@ export function useVimNav(
     const key = e.key;
     const container = getContainer();
 
+    // DEBUG: trace vim nav container resolution
+    if (key === "j" || key === "k") {
+      console.log("[vimNav]", { key, container, scrollHeight: container?.scrollHeight, clientHeight: container?.clientHeight, className: container?.className });
+    }
+
     // i: Enter edit mode (disabled in peek mode)
     if (key === "i" && !pendingKey && options?.onEnterEdit && !isPeekMode()) {
       e.preventDefault();
