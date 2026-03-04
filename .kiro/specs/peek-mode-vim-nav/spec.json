@@ -1,5 +1,5 @@
 {
   "name": "peek-mode-vim-nav",
   "description": "peekモードでのvim navガード・HintBar改善",
-  "status": "in-progress"
+  "status": "done"
 }

@@ -28,6 +28,7 @@ import { createBufferManager } from "./lib/buffer";
 import { createFileWatcher } from "./lib/fileWatcher";
 import { createEditorLazyLoader, type CMEditorInstance } from "./lib/editor";
 import { createSyncEngine, type SyncEngineInstance } from "./lib/sync";
+import { createScrollSync, type ScrollSyncInstance } from "./lib/scroll-sync";
 import type { InputContent, CliArgs } from "./lib/types";
 import type { Tab } from "./lib/tabStore";
 import Preview from "./components/Preview";
@@ -397,6 +398,27 @@ const App: Component = () => {
     // Create sync engine for the active tab
     const tab = tabStore.activeTab();
     if (!tab) return;
+
+    // Capture preview scroll position before switching to split mode
+    const ref = previewRef();
+    if (mode === "split" && ref) {
+      const els = ref.querySelectorAll<HTMLElement>("[data-source-line]");
+      const containerRect = ref.getBoundingClientRect();
+      let bestLine: number | null = null;
+      let bestDist = Infinity;
+      for (const el of els) {
+        const v = el.getAttribute("data-source-line");
+        if (!v) continue;
+        const rect = el.getBoundingClientRect();
+        const dist = Math.abs(rect.top - containerRect.top);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestLine = parseInt(v, 10);
+        }
+        if (rect.top > containerRect.bottom) break;
+      }
+      preSplitPreviewLine = bestLine;
+    }
 
     syncEngineRef?.destroy();
     syncEngineRef = createSyncEngineForTab(tab, markdown());
@@ -878,10 +900,82 @@ const App: Component = () => {
     );
   };
 
+  // Capture preview line before switching to split mode for initial sync
+  let preSplitPreviewLine: number | null = null;
+
   // Split mode content (editor left + preview right + status bar)
   const SplitContent = () => {
     const modules = lazyLoader.getModules();
     if (!modules) return null;
+
+    let splitPreviewRef: HTMLDivElement | undefined;
+    let scrollSyncRef: ScrollSyncInstance | null = null;
+
+    const handleSplitEditorReady = (editor: CMEditorInstance) => {
+      handleEditorReady(editor);
+
+      // Initial sync: move editor cursor to match saved preview position
+      const savedLine = preSplitPreviewLine;
+      preSplitPreviewLine = null; // consume once
+
+      if (savedLine && savedLine > 1) {
+        const view = editor.getView();
+        if (view) {
+          const doc = view.state.doc;
+          if (savedLine <= doc.lines) {
+            const pos = doc.line(savedLine).from;
+            view.dispatch({
+              selection: { anchor: pos },
+              scrollIntoView: true,
+            });
+          }
+        }
+      } else if (splitPreviewRef && scrollSyncRef) {
+        // Fallback: query current preview scroll position
+        requestAnimationFrame(() => {
+          const line = scrollSyncRef?.getLineFromScroll();
+          if (line && line > 1) {
+            const view = editor.getView();
+            if (view) {
+              const doc = view.state.doc;
+              if (line <= doc.lines) {
+                const pos = doc.line(line).from;
+                view.dispatch({
+                  selection: { anchor: pos },
+                  scrollIntoView: true,
+                });
+              }
+            }
+          }
+        });
+      }
+    };
+
+    const handleSplitCursorChange = (pos: { line: number; col: number }) => {
+      setCursorPosition(pos);
+      scrollSyncRef?.syncToLine(pos.line);
+    };
+
+    const handleSplitScroll = () => {
+      // Skip manual-scroll detection during programmatic scrolls
+      if (scrollSyncRef?.isProgrammaticScroll()) return;
+      scrollSyncRef?.notifyManualScroll();
+    };
+
+    // Initialize scroll sync after preview mounts
+    const initScrollSync = (el: HTMLDivElement) => {
+      splitPreviewRef = el;
+      scrollSyncRef = createScrollSync({
+        getPreviewContainer: () => splitPreviewRef ?? null,
+      });
+    };
+
+    // Cleanup on unmount
+    onCleanup(() => {
+      scrollSyncRef?.destroy();
+      scrollSyncRef = null;
+    });
+
     return (
       <div class="flex h-full flex-col">
         <div class="flex-1 min-h-0">
@@ -892,14 +986,20 @@ const App: Component = () => {
                 initialContent={markdown()}
                 onContentChange={handleEditorChange}
                 onVimModeChange={setVimMode}
-                onCursorChange={setCursorPosition}
+                onCursorChange={handleSplitCursorChange}
                 onSaveCommand={handleSave}
                 onSaveQuitCommand={handleSaveQuit}
                 onQuitCommand={handleQuit}
-                onEditorReady={handleEditorReady}
+                onEditorReady={handleSplitEditorReady}
               />
             }
-            right={<Preview html={html()} />}
+            right={
+              <Preview
+                html={html()}
+                ref={initScrollSync}
+                onScroll={handleSplitScroll}
+              />
+            }
           />
         </div>
         <StatusBar

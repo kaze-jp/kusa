@@ -1,0 +1,11 @@
+{
+  "name": "split-scroll-sync",
+  "description": "Split modeでエディタのカーソル位置にプレビューのスクロールを自動追従させる",
+  "issue": "#46",
+  "status": "design-complete",
+  "files": {
+    "requirements": "requirements.md",
+    "design": "design.md",
+    "tasks": "tasks.md"
+  }
+}
