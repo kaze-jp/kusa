@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "AI開発者のためのMarkdownエディター"
 authors = ["kaze-jp"]
 edition = "2021"
+license = "MIT"
+repository = "https://github.com/kaze-jp/kusa"
 
 [lib]
 name = "kusa_lib"
