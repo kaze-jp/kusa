@@ -13,6 +13,7 @@ interface TOCPanelProps {
   activeHeadingId: string | null;
   isVisible: boolean;
   onHeadingClick: (id: string) => void;
+  onToggle: () => void;
 }
 
 /**
@@ -56,34 +57,62 @@ const TOCPanel: Component<TOCPanelProps> = (props) => {
   };
 
   return (
-    <Show when={props.isVisible && props.headings.length > 0}>
-      <nav
-        ref={panelRef}
-        role="navigation"
-        aria-label="Table of contents"
-        class="toc-panel"
+    <Show when={props.headings.length > 0}>
+      <Show
+        when={props.isVisible}
+        fallback={
+          <button
+            type="button"
+            class="toc-collapsed-toggle"
+            onClick={() => props.onToggle()}
+            aria-label="Show table of contents"
+            title="Show TOC (Ctrl+B)"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M2 3h12v1.5H2V3zm0 4h8v1.5H2V7zm0 4h10v1.5H2V11z" />
+            </svg>
+          </button>
+        }
       >
-        <div class="toc-header">
-          <span class="toc-title">Contents</span>
-        </div>
-        <ul class="toc-list">
-          <For each={props.headings}>
-            {(heading) => (
-              <li
-                data-heading-id={heading.id}
-                class={`toc-item ${indentClass(heading.level)} ${
-                  props.activeHeadingId === heading.id ? "toc-item-active" : ""
-                }`}
-                onClick={() => props.onHeadingClick(heading.id)}
-              >
-                <span class="toc-item-text" title={heading.text}>
-                  {heading.text}
-                </span>
-              </li>
-            )}
-          </For>
-        </ul>
-      </nav>
+        <nav
+          ref={panelRef}
+          role="navigation"
+          aria-label="Table of contents"
+          class="toc-panel"
+        >
+          <div class="toc-header">
+            <span class="toc-title">Contents</span>
+            <button
+              type="button"
+              class="toc-toggle-btn"
+              onClick={() => props.onToggle()}
+              aria-label="Hide table of contents"
+              title="Hide TOC (Ctrl+B)"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M10.354 3.146a.5.5 0 0 1 0 .708L6.207 8l4.147 4.146a.5.5 0 0 1-.708.708l-4.5-4.5a.5.5 0 0 1 0-.708l4.5-4.5a.5.5 0 0 1 .708 0z" />
+              </svg>
+            </button>
+          </div>
+          <ul class="toc-list">
+            <For each={props.headings}>
+              {(heading) => (
+                <li
+                  data-heading-id={heading.id}
+                  class={`toc-item ${indentClass(heading.level)} ${
+                    props.activeHeadingId === heading.id ? "toc-item-active" : ""
+                  }`}
+                  onClick={() => props.onHeadingClick(heading.id)}
+                >
+                  <span class="toc-item-text" title={heading.text}>
+                    {heading.text}
+                  </span>
+                </li>
+              )}
+            </For>
+          </ul>
+        </nav>
+      </Show>
     </Show>
   );
 };

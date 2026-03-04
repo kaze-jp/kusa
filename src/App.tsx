@@ -890,6 +890,7 @@ const App: Component = () => {
           activeHeadingId={activeId()}
           isVisible={tocVisible()}
           onHeadingClick={handleHeadingClick}
+          onToggle={() => setTocVisible((v) => !v)}
         />
         <div class="preview-wrapper">
           <SearchBar

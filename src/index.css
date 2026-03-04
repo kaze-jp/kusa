@@ -190,6 +190,9 @@ body {
   background: var(--color-toc-bg);
   border-bottom: 1px solid var(--color-toc-border);
   z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .toc-title {
@@ -198,6 +201,51 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-text-tertiary);
+}
+
+.toc-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.toc-toggle-btn:hover {
+  background: var(--color-toc-item-hover);
+  color: var(--color-text);
+}
+
+.toc-toggle-btn:focus-visible,
+.toc-collapsed-toggle:focus-visible {
+  outline: 2px solid var(--color-toc-active);
+  outline-offset: 2px;
+}
+
+.toc-collapsed-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 100%;
+  border: none;
+  border-right: 1px solid var(--color-toc-border);
+  background: var(--color-toc-bg);
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.toc-collapsed-toggle:hover {
+  background: var(--color-toc-item-hover);
+  color: var(--color-text);
 }
 
 .toc-list {
