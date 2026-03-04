@@ -39,6 +39,8 @@ export interface VimNavOptions {
  * - `gt` -> Next tab (if callback provided)
  * - `G`  -> Scroll to bottom
  * - `gT` -> Previous tab (if callback provided)
+ * - `H`  -> Previous tab (if callback provided)
+ * - `L`  -> Next tab (if callback provided)
  * - `]]` -> Jump to next heading
  * - `[[` -> Jump to previous heading
  */
@@ -167,6 +169,20 @@ export function useVimNav(
       e.preventDefault();
       scrollToBottom();
       resetSequence();
+      return;
+    }
+
+    // H (Shift+h): Previous tab
+    if (key === "H" && !pendingKey && options?.onPrevTab) {
+      e.preventDefault();
+      options.onPrevTab();
+      return;
+    }
+
+    // L (Shift+l): Next tab
+    if (key === "L" && !pendingKey && options?.onNextTab) {
+      e.preventDefault();
+      options.onNextTab();
       return;
     }
 
