@@ -25,6 +25,8 @@ import { resolveInputSource } from "./lib/input-resolver";
 import { updateWindowTitle } from "./lib/title-bar";
 import { createBufferManager } from "./lib/buffer";
 import { createFileWatcher } from "./lib/fileWatcher";
+import { createEditorLazyLoader, type CMEditorInstance } from "./lib/editor";
+import { createSyncEngine, type SyncEngineInstance } from "./lib/sync";
 import type { InputContent, CliArgs } from "./lib/types";
 import Preview from "./components/Preview";
 import TOCPanel from "./components/TOCPanel";
@@ -36,6 +38,9 @@ import FileList, { type MdFileEntry } from "./components/FileList";
 import TabBar from "./components/TabBar";
 import ErrorDisplay from "./components/ErrorDisplay";
 import DropZone from "./components/DropZone";
+import EditorPane from "./components/EditorPane";
+import SplitLayout from "./components/SplitLayout";
+import StatusBar from "./components/StatusBar";
 import {
   initWindowMode,
   isPeekMode,
@@ -45,12 +50,18 @@ import {
 /** View mode for the top-level layout */
 type AppViewMode = "loading" | "demo" | "file-list" | "preview" | "buffer" | "error";
 
+/** Sub-mode for edit capabilities within preview view */
+type EditMode = "preview" | "edit" | "split";
+
 const App: Component = () => {
   // Window mode initialization
   const [modeReady, setModeReady] = createSignal(false);
 
   // View mode
   const [viewMode, setViewMode] = createSignal<AppViewMode>("loading");
+
+  // Edit sub-mode (only relevant when viewMode is "preview")
+  const [editMode, setEditMode] = createSignal<EditMode>("preview");
 
   // Directory state
   const [dirPath, setDirPath] = createSignal<string | null>(null);
@@ -81,6 +92,20 @@ const App: Component = () => {
     type: "info" | "warning" | "error";
   } | null>(null);
 
+  // Editor state signals
+  const [vimMode, setVimMode] = createSignal<"NORMAL" | "INSERT" | "VISUAL" | "COMMAND">("NORMAL");
+  const [cursorPosition, setCursorPosition] = createSignal<{ line: number; col: number }>({ line: 1, col: 1 });
+  const [isDirty, setIsDirty] = createSignal(false);
+  const [saveNotification, setSaveNotification] = createSignal<{ text: string; type: "success" | "error" } | null>(null);
+
+  // Editor lazy loader (initialized once, modules cached)
+  const lazyLoader = createEditorLazyLoader();
+
+  // Mutable refs for editor and sync engine
+  let editorRef: CMEditorInstance | null = null;
+  let syncEngineRef: SyncEngineInstance | null = null;
+  let returningToPreview = false;
+
   // Preview container ref
   let previewRef: HTMLDivElement | undefined;
   const getPreviewRef = () => previewRef;
@@ -101,6 +126,8 @@ const App: Component = () => {
     {
       onNextTab: () => tabStore.nextTab(),
       onPrevTab: () => tabStore.prevTab(),
+      onEnterEdit: () => enterEditMode("edit"),
+      getEditMode: () => editMode(),
     }
   );
 
@@ -113,6 +140,10 @@ const App: Component = () => {
       if (tab && tab.filePath === path) {
         tabStore.updateTabContent(tab.id, content);
         tabStore.markClean(tab.id);
+      }
+      // Update editor content if in edit/split mode and not dirty
+      if (editMode() !== "preview" && editorRef && !isDirty()) {
+        editorRef.setContent(content);
       }
       setFileNotification({ text: "File updated externally", type: "info" });
       setTimeout(() => setFileNotification(null), 3000);
@@ -134,7 +165,11 @@ const App: Component = () => {
     },
   });
 
-  onCleanup(() => fileWatcher.destroy());
+  onCleanup(() => {
+    fileWatcher.destroy();
+    syncEngineRef?.destroy();
+    editorRef = null;
+  });
 
   // -----------------------------------------------------------------------
   // Tauri event listeners
@@ -229,12 +264,28 @@ const App: Component = () => {
   }
 
   /** Handle file drop */
-  function handleFileDrop(path: string) {
+  async function handleFileDrop(path: string) {
+    // Return to preview mode if in edit/split before opening new file
+    if (editMode() !== "preview") {
+      await returnToPreview();
+    }
     openFileInTab(path);
   }
 
   /** Handle tab close */
-  function handleTabClose(id: string) {
+  async function handleTabClose(id: string) {
+    // If closing the active tab while in edit/split mode, save and clean up
+    if (editMode() !== "preview" && tabStore.activeTabId() === id) {
+      if (isDirty()) {
+        await syncEngineRef?.forceSave();
+      }
+      syncEngineRef?.destroy();
+      syncEngineRef = null;
+      editorRef = null;
+      setEditMode("preview");
+      setIsDirty(false);
+    }
+
     const hasRemaining = tabStore.closeTab(id);
     if (!hasRemaining) {
       // No tabs remaining — stop watching
@@ -277,6 +328,124 @@ const App: Component = () => {
   }
 
   // -----------------------------------------------------------------------
+  // Edit mode management
+  // -----------------------------------------------------------------------
+
+  /** Create a SyncEngine instance for the given file */
+  function createSyncEngineForFile(filePath: string, initialContent: string): SyncEngineInstance {
+    return createSyncEngine({
+      previewDebounceMs: 250,
+      autoSaveDebounceMs: 800,
+      filePath,
+      initialContent,
+      onPreviewUpdate: (newHtml) => setHtml(newHtml),
+      onSaveComplete: () => {
+        setSaveNotification({ text: "Saved", type: "success" });
+        setIsDirty(false);
+        const t = tabStore.activeTab();
+        if (t) tabStore.markClean(t.id);
+      },
+      onSaveError: (error) => {
+        setSaveNotification({ text: `Save failed: ${error}`, type: "error" });
+      },
+      onDirtyChange: (dirty) => setIsDirty(dirty),
+    });
+  }
+
+  /** Enter edit or split mode */
+  async function enterEditMode(mode: "edit" | "split") {
+    // Guard: only allow when in file preview mode and editable
+    if (viewMode() !== "preview") return;
+    if (bufferManager.state.isBufferMode()) return;
+    if (editMode() !== "preview") return;
+
+    // Load CodeMirror modules if needed
+    if (lazyLoader.state() !== "loaded") {
+      if (lazyLoader.state() === "loading") return;
+      await lazyLoader.load();
+      if (lazyLoader.state() === "error") {
+        setFileNotification({ text: "Failed to load editor", type: "error" });
+        setTimeout(() => setFileNotification(null), 3000);
+        return;
+      }
+    }
+
+    // Create sync engine for the active file
+    const tab = tabStore.activeTab();
+    if (!tab) return;
+
+    syncEngineRef?.destroy();
+    syncEngineRef = createSyncEngineForFile(tab.filePath, markdown());
+
+    setEditMode(mode);
+  }
+
+  /** Return to preview mode from edit/split */
+  async function returnToPreview(forceSave = false) {
+    if (editMode() === "preview" || returningToPreview) return;
+    returningToPreview = true;
+    try {
+      // Get latest content from editor before unmount
+      const content = editorRef?.getContent() ?? markdown();
+
+      // Save if dirty or force save requested (:wq)
+      if (forceSave || isDirty()) {
+        await syncEngineRef?.forceSave();
+      }
+
+      // Clean up sync engine
+      syncEngineRef?.destroy();
+      syncEngineRef = null;
+      editorRef = null;
+
+      // Update markdown for preview rendering
+      setMarkdown(content);
+
+      // Update tab content
+      const tab = tabStore.activeTab();
+      if (tab) {
+        tabStore.updateTabContent(tab.id, content);
+        tabStore.markClean(tab.id);
+      }
+
+      // Reset editor state
+      setIsDirty(false);
+      setVimMode("NORMAL");
+      setCursorPosition({ line: 1, col: 1 });
+
+      // Switch to preview
+      setEditMode("preview");
+    } finally {
+      returningToPreview = false;
+    }
+  }
+
+  /** Handle content change from editor (feeds sync engine only, NOT markdown signal) */
+  function handleEditorChange(content: string) {
+    syncEngineRef?.handleContentChange(content);
+  }
+
+  /** Handle :w command — force save */
+  function handleSave() {
+    syncEngineRef?.forceSave();
+  }
+
+  /** Handle :wq command — save and return to preview */
+  function handleSaveQuit() {
+    returnToPreview(true);
+  }
+
+  /** Handle :q command — return to preview */
+  function handleQuit() {
+    returnToPreview();
+  }
+
+  /** Handle editor ready callback */
+  function handleEditorReady(editor: CMEditorInstance) {
+    editorRef = editor;
+  }
+
+  // -----------------------------------------------------------------------
   // Sync active tab content to markdown signal
   // -----------------------------------------------------------------------
 
@@ -286,6 +455,14 @@ const App: Component = () => {
       setMarkdown(tab.content);
       // Watch the active tab's file for external changes
       fileWatcher.watch(tab.filePath).catch(() => {});
+
+      // If in edit/split mode, update editor content and recreate sync engine
+      if (editMode() !== "preview" && editorRef) {
+        editorRef.setContent(tab.content);
+        syncEngineRef?.destroy();
+        syncEngineRef = createSyncEngineForFile(tab.filePath, tab.content);
+        setIsDirty(false);
+      }
     }
   });
 
@@ -390,24 +567,35 @@ const App: Component = () => {
   // -----------------------------------------------------------------------
 
   function handleKeyDown(e: KeyboardEvent) {
-    // Cmd+F / Ctrl+F always works, even when input is focused (to toggle search)
-    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "f") {
+    const isMeta = e.metaKey || e.ctrlKey;
+
+    // === Global shortcuts (work even when CodeMirror editor has focus) ===
+
+    // Cmd+F / Ctrl+F: Toggle search
+    if (isMeta && !e.shiftKey && e.key === "f") {
       e.preventDefault();
       setSearchOpen((v) => !v);
       return;
     }
 
-    // Don't handle other shortcuts when input elements are focused
-    const target = e.target as HTMLElement;
-    if (
-      target.tagName === "INPUT" ||
-      target.tagName === "TEXTAREA" ||
-      target.isContentEditable
-    ) {
+    // Ctrl+E: Toggle Split mode / return to preview
+    if (e.ctrlKey && !e.metaKey && e.key === "e") {
+      e.preventDefault();
+      if (viewMode() !== "preview" || bufferManager.state.isBufferMode()) return;
+      if (editMode() === "preview") {
+        enterEditMode("split");
+      } else {
+        returnToPreview();
+      }
       return;
     }
 
-    const isMeta = e.metaKey || e.ctrlKey;
+    // Escape: Return to preview from edit/split NORMAL mode
+    if (e.key === "Escape" && editMode() !== "preview" && vimMode() === "NORMAL" && !searchOpen()) {
+      e.preventDefault();
+      returnToPreview();
+      return;
+    }
 
     // Cmd+W: Close active tab, or close window if no tabs
     if (isMeta && e.key === "w") {
@@ -458,35 +646,46 @@ const App: Component = () => {
     }
 
     // Cmd+Shift+F / Ctrl+Shift+F: Toggle focus mode
-    if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === "f" || e.key === "F")) {
+    if (isMeta && e.shiftKey && (e.key === "f" || e.key === "F")) {
       e.preventDefault();
       focusMode.toggle();
       return;
     }
 
     // Cmd+= / Ctrl+=: Zoom in
-    if ((e.metaKey || e.ctrlKey) && (e.key === "=" || e.key === "+")) {
+    if (isMeta && (e.key === "=" || e.key === "+")) {
       e.preventDefault();
       zoom.zoomIn();
       return;
     }
 
     // Cmd+- / Ctrl+-: Zoom out
-    if ((e.metaKey || e.ctrlKey) && e.key === "-") {
+    if (isMeta && e.key === "-") {
       e.preventDefault();
       zoom.zoomOut();
       return;
     }
 
     // Cmd+0 / Ctrl+0: Reset zoom
-    if ((e.metaKey || e.ctrlKey) && e.key === "0") {
+    if (isMeta && e.key === "0") {
       e.preventDefault();
       zoom.resetZoom();
       return;
     }
 
+    // === Preview-only shortcuts (blocked when editor/input has focus) ===
+
+    const target = e.target as HTMLElement;
+    if (
+      target.tagName === "INPUT" ||
+      target.tagName === "TEXTAREA" ||
+      target.isContentEditable
+    ) {
+      return;
+    }
+
     // Vim `/`: Open search (only when search is not already open)
-    if (e.key === "/" && !e.metaKey && !e.ctrlKey && !e.altKey && !searchOpen()) {
+    if (e.key === "/" && !isMeta && !e.altKey && !searchOpen()) {
       e.preventDefault();
       setSearchOpen(true);
       return;
@@ -577,6 +776,69 @@ const App: Component = () => {
     </>
   );
 
+  // Edit mode content (full-screen editor + status bar)
+  const EditContent = () => {
+    const modules = lazyLoader.getModules();
+    if (!modules) return null;
+    return (
+      <div class="flex h-full flex-col">
+        <div class="flex-1 min-h-0">
+          <EditorPane
+            modules={modules}
+            initialContent={markdown()}
+            onContentChange={handleEditorChange}
+            onVimModeChange={setVimMode}
+            onCursorChange={setCursorPosition}
+            onSaveCommand={handleSave}
+            onSaveQuitCommand={handleSaveQuit}
+            onQuitCommand={handleQuit}
+            onEditorReady={handleEditorReady}
+          />
+        </div>
+        <StatusBar
+          vimMode={vimMode}
+          cursorPosition={cursorPosition}
+          isDirty={isDirty}
+          notification={saveNotification}
+        />
+      </div>
+    );
+  };
+
+  // Split mode content (editor left + preview right + status bar)
+  const SplitContent = () => {
+    const modules = lazyLoader.getModules();
+    if (!modules) return null;
+    return (
+      <div class="flex h-full flex-col">
+        <div class="flex-1 min-h-0">
+          <SplitLayout
+            left={
+              <EditorPane
+                modules={modules}
+                initialContent={markdown()}
+                onContentChange={handleEditorChange}
+                onVimModeChange={setVimMode}
+                onCursorChange={setCursorPosition}
+                onSaveCommand={handleSave}
+                onSaveQuitCommand={handleSaveQuit}
+                onQuitCommand={handleQuit}
+                onEditorReady={handleEditorReady}
+              />
+            }
+            right={<Preview html={html()} />}
+          />
+        </div>
+        <StatusBar
+          vimMode={vimMode}
+          cursorPosition={cursorPosition}
+          isDirty={isDirty}
+          notification={saveNotification}
+        />
+      </div>
+    );
+  };
+
   // Loading indicator
   const LoadingView = () => (
     <div class="h-full flex items-center justify-center">
@@ -604,7 +866,19 @@ const App: Component = () => {
 
           <Match when={viewMode() === "preview" || viewMode() === "demo" || viewMode() === "buffer"}>
             <DropZone onFileDrop={handleFileDrop}>
-              <PreviewContent />
+              <Show
+                when={viewMode() === "preview" && editMode() !== "preview"}
+                fallback={<PreviewContent />}
+              >
+                <Switch>
+                  <Match when={editMode() === "edit"}>
+                    <EditContent />
+                  </Match>
+                  <Match when={editMode() === "split"}>
+                    <SplitContent />
+                  </Match>
+                </Switch>
+              </Show>
             </DropZone>
           </Match>
 
