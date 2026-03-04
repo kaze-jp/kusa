@@ -29,9 +29,12 @@ import { createFileWatcher } from "./lib/fileWatcher";
 import { createEditorLazyLoader, type CMEditorInstance } from "./lib/editor";
 import { createSyncEngine, type SyncEngineInstance } from "./lib/sync";
 import { createScrollSync, type ScrollSyncInstance } from "./lib/scroll-sync";
+import { createBufferSplitStore } from "./lib/bufferSplitStore";
 import type { InputContent, CliArgs } from "./lib/types";
 import type { Tab } from "./lib/tabStore";
 import Preview from "./components/Preview";
+import BufferPane from "./components/BufferPane";
+import BufferPicker from "./components/BufferPicker";
 import TOCPanel from "./components/TOCPanel";
 import HeadingPicker from "./components/HeadingPicker";
 import ReadingProgress from "./components/ReadingProgress";
@@ -74,6 +77,13 @@ const App: Component = () => {
 
   // Tab store
   const tabStore = createTabStore();
+
+  // Buffer split store (nvim-like vsplit)
+  const bufferSplit = createBufferSplitStore();
+
+  // Ctrl-W two-stroke keybinding state
+  const [ctrlWPending, setCtrlWPending] = createSignal(false);
+  let ctrlWTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Core state (for current active tab or demo)
   const [markdown, setMarkdown] = createSignal("");
@@ -134,8 +144,20 @@ const App: Component = () => {
     headings,
     activeId,
     {
-      onNextTab: () => tabStore.nextTab(),
-      onPrevTab: () => tabStore.prevTab(),
+      onNextTab: () => {
+        if (bufferSplit.state().active) {
+          bufferSplit.cyclePaneBuffer("next", tabStore.tabs());
+        } else {
+          tabStore.nextTab();
+        }
+      },
+      onPrevTab: () => {
+        if (bufferSplit.state().active) {
+          bufferSplit.cyclePaneBuffer("prev", tabStore.tabs());
+        } else {
+          tabStore.prevTab();
+        }
+      },
       onEnterEdit: () => enterEditMode("edit"),
       getEditMode: () => editMode(),
     }
@@ -325,6 +347,12 @@ const App: Component = () => {
       editorRef = null;
       setEditMode("preview");
       setIsDirty(false);
+    }
+
+    // Exit buffer split if the closed tab was assigned to a pane
+    const splitState = bufferSplit.state();
+    if (splitState.active && (splitState.leftTabId === id || splitState.rightTabId === id)) {
+      bufferSplit.exitSplit();
     }
 
     const hasRemaining = tabStore.closeTab(id);
@@ -709,10 +737,11 @@ const App: Component = () => {
       return;
     }
 
-    // Ctrl+E: Toggle Split mode / return to preview
+    // Ctrl+E: Toggle Split mode / return to preview (disabled during buffer split)
     if (e.ctrlKey && !e.metaKey && e.key === "e") {
       e.preventDefault();
       if (viewMode() !== "preview" || bufferManager.state.isBufferMode()) return;
+      if (bufferSplit.state().active) return; // Req 4.1
       if (editMode() === "preview") {
         enterEditMode("split");
       } else {
@@ -721,8 +750,64 @@ const App: Component = () => {
       return;
     }
 
-    // Escape: Return to preview from edit/split NORMAL mode, or from file-list to active tab
+    // Ctrl-W: Two-stroke keybinding prefix for buffer split
+    if (e.ctrlKey && !e.metaKey && e.key === "w" && !isMeta) {
+      // Only handle Ctrl-W prefix in preview mode contexts
+      if (viewMode() === "preview" && editMode() === "preview") {
+        // Don't intercept if no tabs open
+        if (tabStore.tabCount() === 0) return;
+        e.preventDefault();
+        setCtrlWPending(true);
+        if (ctrlWTimer) clearTimeout(ctrlWTimer);
+        ctrlWTimer = setTimeout(() => setCtrlWPending(false), 500);
+        return;
+      }
+    }
+
+    // Second stroke after Ctrl-W
+    if (ctrlWPending()) {
+      setCtrlWPending(false);
+      if (ctrlWTimer) { clearTimeout(ctrlWTimer); ctrlWTimer = null; }
+
+      const splitState = bufferSplit.state();
+
+      switch (e.key) {
+        case "v": // Ctrl-W v: enter buffer split
+          e.preventDefault();
+          if (!splitState.active && editMode() === "preview") { // Req 4.3
+            const activeId = tabStore.activeTabId();
+            if (activeId) bufferSplit.enterSplit(activeId);
+          }
+          return;
+        case "q": // Ctrl-W q: exit buffer split
+          e.preventDefault();
+          if (splitState.active) bufferSplit.exitSplit();
+          return;
+        case "h": // Ctrl-W h: focus left pane
+          e.preventDefault();
+          if (splitState.active) bufferSplit.setFocusedPane("left");
+          return;
+        case "l": // Ctrl-W l: focus right pane
+          e.preventDefault();
+          if (splitState.active) bufferSplit.setFocusedPane("right");
+          return;
+      }
+      return;
+    }
+
+    // Escape: Return to preview from edit/split NORMAL mode, exit buffer split, or from file-list to active tab
     if (e.key === "Escape" && !searchOpen() && !filePickerOpen() && !systemPickerOpen()) {
+      // Exit buffer split picker first, then buffer split itself
+      if (bufferSplit.state().showBufferPicker) {
+        e.preventDefault();
+        bufferSplit.closeBufferPicker();
+        return;
+      }
+      if (bufferSplit.state().active) {
+        e.preventDefault();
+        bufferSplit.exitSplit();
+        return;
+      }
       if (editMode() !== "preview" && vimMode() === "NORMAL") {
         e.preventDefault();
         returnToPreview();
@@ -901,6 +986,70 @@ const App: Component = () => {
       }}
     </Show>
   );
+
+  // Buffer split HTML signals (process markdown for each pane independently)
+  const [leftHtml, setLeftHtml] = createSignal("");
+  const [rightHtml, setRightHtml] = createSignal("");
+
+  createEffect(async () => {
+    const s = bufferSplit.state();
+    if (!s.active) return;
+    const leftTab = s.leftTabId ? tabStore.tabs().find((t) => t.id === s.leftTabId) : null;
+    if (leftTab) {
+      const result = await processMarkdown(leftTab.content);
+      setLeftHtml(result);
+    } else {
+      setLeftHtml("");
+    }
+  });
+
+  createEffect(async () => {
+    const s = bufferSplit.state();
+    if (!s.active) return;
+    const rightTab = s.rightTabId ? tabStore.tabs().find((t) => t.id === s.rightTabId) : null;
+    if (rightTab) {
+      const result = await processMarkdown(rightTab.content);
+      setRightHtml(result);
+    } else {
+      setRightHtml("");
+    }
+  });
+
+  // Buffer split content (two preview panes side by side)
+  const BufferSplitContent = () => {
+    const splitState = () => bufferSplit.state();
+    return (
+      <div class="relative h-full">
+        <SplitLayout
+          left={
+            <BufferPane
+              tabId={splitState().leftTabId}
+              tabs={tabStore.tabs()}
+              html={leftHtml()}
+              isFocused={splitState().focusedPane === "left"}
+              onFocus={() => bufferSplit.setFocusedPane("left")}
+            />
+          }
+          right={
+            <BufferPane
+              tabId={splitState().rightTabId}
+              tabs={tabStore.tabs()}
+              html={rightHtml()}
+              isFocused={splitState().focusedPane === "right"}
+              onFocus={() => bufferSplit.setFocusedPane("right")}
+            />
+          }
+        />
+        <Show when={splitState().showBufferPicker}>
+          <BufferPicker
+            tabs={tabStore.tabs()}
+            onSelect={(id) => bufferSplit.switchPaneBuffer(id)}
+            onCancel={() => bufferSplit.closeBufferPicker()}
+          />
+        </Show>
+      </div>
+    );
+  };
 
   // Preview content with reading-support features
   const PreviewContent = () => (
@@ -1107,8 +1256,14 @@ const App: Component = () => {
       {/* Tab bar: always shown (includes + button) */}
       <TabBar
         tabs={tabStore.tabs}
-        activeTabId={tabStore.activeTabId}
-        onTabClick={(id) => tabStore.switchTab(id)}
+        activeTabId={() => bufferSplit.state().active ? bufferSplit.focusedTabId() : tabStore.activeTabId()}
+        onTabClick={(id) => {
+          if (bufferSplit.state().active) {
+            bufferSplit.switchPaneBuffer(id);
+          } else {
+            tabStore.switchTab(id);
+          }
+        }}
         onTabClose={handleTabClose}
         onNewTab={handleNewTab}
         isMaxTabs={tabStore.tabCount() >= 20}
@@ -1127,10 +1282,13 @@ const App: Component = () => {
           <Match when={viewMode() === "preview" || viewMode() === "demo" || viewMode() === "buffer"}>
             <DropZone onFileDrop={handleFileDrop}>
               <Show
-                when={viewMode() === "preview" && editMode() !== "preview"}
+                when={viewMode() === "preview" && (editMode() !== "preview" || bufferSplit.state().active)}
                 fallback={<PreviewContent />}
               >
                 <Switch>
+                  <Match when={bufferSplit.state().active}>
+                    <BufferSplitContent />
+                  </Match>
                   <Match when={editMode() === "edit"}>
                     <EditContent />
                   </Match>

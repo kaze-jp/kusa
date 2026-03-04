@@ -758,15 +758,17 @@ mod tests {
         fs::create_dir(&l2).unwrap();
         fs::write(l2.join("l2.md"), "# L2").unwrap();
 
-        // depth=1 should only get root files and l1 files
+        // depth=2: root(0) -> l1 dir(1) -> l1.md(2), so root.md + l1.md
         let result = search_md_files(
             dir.path().to_string_lossy().to_string(),
             None,
-            Some(1),
+            Some(2),
         );
         assert!(result.is_ok());
         let files = result.unwrap();
         assert_eq!(files.len(), 2);
+        assert!(files.iter().any(|f| f.name == "root.md"));
+        assert!(files.iter().any(|f| f.name == "l1.md"));
     }
 
     #[test]
