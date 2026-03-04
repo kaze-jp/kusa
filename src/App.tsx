@@ -130,6 +130,18 @@ const App: Component = () => {
   const [previewRef, setPreviewRef] = createSignal<HTMLDivElement | undefined>();
   const getPreviewRef = previewRef;
 
+  // Buffer split pane refs (for vim nav targeting)
+  const [leftPaneRef, setLeftPaneRef] = createSignal<HTMLDivElement | undefined>();
+  const [rightPaneRef, setRightPaneRef] = createSignal<HTMLDivElement | undefined>();
+
+  // Active container: returns focused pane in split mode, main preview otherwise
+  const getActiveContainer = () => {
+    if (bufferSplit.state().active) {
+      return bufferSplit.state().focusedPane === "left" ? leftPaneRef() : rightPaneRef();
+    }
+    return previewRef();
+  };
+
   // Derived data
   const headings = createMemo(() => extractHeadings(markdown()));
 
@@ -140,7 +152,7 @@ const App: Component = () => {
   const readingProgress = useReadingProgress();
   const focusMode = useFocusMode(getPreviewRef, activeId);
   const { pickerOpen, setPickerOpen, actions } = useVimNav(
-    getPreviewRef,
+    getActiveContainer,
     headings,
     activeId,
     {
@@ -750,18 +762,20 @@ const App: Component = () => {
       return;
     }
 
-    // Ctrl-W: Two-stroke keybinding prefix for buffer split
-    if (e.ctrlKey && !e.metaKey && e.key === "w" && !isMeta) {
-      // Only handle Ctrl-W prefix in preview mode contexts
-      if (viewMode() === "preview" && editMode() === "preview") {
-        // Don't intercept if no tabs open
-        if (tabStore.tabCount() === 0) return;
-        e.preventDefault();
+    // Ctrl-W: Two-stroke keybinding prefix for buffer split (Vim-style)
+    if (e.ctrlKey && !e.metaKey && e.key === "w") {
+      e.preventDefault(); // Always prevent default to avoid window/tab close
+      // Activate prefix when in preview mode with tabs, or when split is already active
+      const splitActive = bufferSplit.state().active;
+      if (
+        (viewMode() === "preview" && editMode() === "preview" && tabStore.tabCount() > 0) ||
+        splitActive
+      ) {
         setCtrlWPending(true);
         if (ctrlWTimer) clearTimeout(ctrlWTimer);
         ctrlWTimer = setTimeout(() => setCtrlWPending(false), 500);
-        return;
       }
+      return;
     }
 
     // Second stroke after Ctrl-W
@@ -795,17 +809,26 @@ const App: Component = () => {
       return;
     }
 
+    // Ctrl+H/J/K/L: Direct pane focus in buffer split
+    if (e.ctrlKey && !e.metaKey && bufferSplit.state().active) {
+      if (e.key === "h" || e.key === "k") {
+        e.preventDefault();
+        bufferSplit.setFocusedPane("left");
+        return;
+      }
+      if (e.key === "l" || e.key === "j") {
+        e.preventDefault();
+        bufferSplit.setFocusedPane("right");
+        return;
+      }
+    }
+
     // Escape: Return to preview from edit/split NORMAL mode, exit buffer split, or from file-list to active tab
     if (e.key === "Escape" && !searchOpen() && !filePickerOpen() && !systemPickerOpen()) {
       // Exit buffer split picker first, then buffer split itself
       if (bufferSplit.state().showBufferPicker) {
         e.preventDefault();
         bufferSplit.closeBufferPicker();
-        return;
-      }
-      if (bufferSplit.state().active) {
-        e.preventDefault();
-        bufferSplit.exitSplit();
         return;
       }
       if (editMode() !== "preview" && vimMode() === "NORMAL") {
@@ -835,7 +858,7 @@ const App: Component = () => {
     }
 
     // Cmd+W: Close active tab, or close window if no tabs
-    if (isMeta && e.key === "w") {
+    if (e.metaKey && e.key === "w") {
       e.preventDefault();
       const activeId = tabStore.activeTabId();
       if (activeId && tabStore.tabCount() > 0) {
@@ -1028,6 +1051,7 @@ const App: Component = () => {
               html={leftHtml()}
               isFocused={splitState().focusedPane === "left"}
               onFocus={() => bufferSplit.setFocusedPane("left")}
+              previewRef={setLeftPaneRef}
             />
           }
           right={
@@ -1037,6 +1061,7 @@ const App: Component = () => {
               html={rightHtml()}
               isFocused={splitState().focusedPane === "right"}
               onFocus={() => bufferSplit.setFocusedPane("right")}
+              previewRef={setRightPaneRef}
             />
           }
         />

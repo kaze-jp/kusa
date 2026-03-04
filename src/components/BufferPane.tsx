@@ -13,6 +13,7 @@ interface BufferPaneProps {
   html: string;
   isFocused: boolean;
   onFocus: () => void;
+  previewRef?: (el: HTMLDivElement) => void;
 }
 
 const BufferPane: Component<BufferPaneProps> = (props) => {
@@ -45,7 +46,7 @@ const BufferPane: Component<BufferPaneProps> = (props) => {
             </div>
           }
         >
-          <Preview html={props.html} />
+          <Preview html={props.html} ref={props.previewRef} />
         </Show>
       </div>
     </div>
