@@ -178,6 +178,20 @@ export function createCMEditor(
   const extensions = [
     // Override Ctrl+E/Y/D/U before vim processes them
     EditorView.domEventHandlers({
+      compositionstart(_event, view) {
+        // Block IME composition in vim normal/visual mode
+        // (only allow in insert mode)
+        const cmInstance = modules.getCM(view);
+        if (cmInstance) {
+          const vimState = (cmInstance as any).state?.vim;
+          if (vimState && !vimState.insertMode) {
+            view.contentDOM.blur();
+            setTimeout(() => view.focus(), 10);
+            return true;
+          }
+        }
+        return false;
+      },
       keydown(event, view) {
         if (!event.ctrlKey) return false;
 
