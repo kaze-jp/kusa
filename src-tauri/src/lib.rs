@@ -1,4 +1,5 @@
 mod commands;
+mod watcher;
 mod window_presets;
 
 use std::io::IsTerminal;
@@ -151,6 +152,7 @@ pub fn run() {
             content: stdin_content,
         })
         .manage(WindowModeState::default())
+        .manage(watcher::FileWatcherState::default())
         .invoke_handler(tauri::generate_handler![
             commands::read_file,
             commands::list_md_files,
@@ -162,6 +164,8 @@ pub fn run() {
             commands::load_preference,
             commands::promote_to_full,
             commands::get_window_mode,
+            commands::start_file_watch,
+            commands::stop_file_watch,
         ])
         .plugin(
             tauri_plugin_single_instance::init(|app, args, _cwd| {
