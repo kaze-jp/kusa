@@ -28,9 +28,11 @@ export function useActiveHeading() {
     }
 
     let ticking = false;
+    let rafId: number | null = null;
 
     function update() {
       ticking = false;
+      rafId = null;
 
       const containerTop = container.getBoundingClientRect().top;
       // A heading is "active" when its top edge is at or above this
@@ -57,7 +59,7 @@ export function useActiveHeading() {
     function onScroll() {
       if (!ticking) {
         ticking = true;
-        requestAnimationFrame(update);
+        rafId = requestAnimationFrame(update);
       }
     }
 
@@ -68,6 +70,11 @@ export function useActiveHeading() {
 
     cleanupFn = () => {
       container.removeEventListener("scroll", onScroll);
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+        ticking = false;
+      }
     };
   }
 
