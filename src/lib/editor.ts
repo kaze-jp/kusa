@@ -174,8 +174,18 @@ export function createCMEditor(
   Vim.map("y", '"+y', "visual");
   Vim.map("Y", '"+Y', "normal");
 
+  // Track IME composition in non-insert vim mode to block document changes
+  let normalModeComposing = false;
+
   // Build extensions
   const extensions = [
+    // Block document changes from IME composition in vim normal/visual mode
+    EditorState.transactionFilter.of((tr) => {
+      if (normalModeComposing && tr.docChanged) {
+        return [];
+      }
+      return tr;
+    }),
     // Override Ctrl+D/U before vim processes them to prevent wrap-around at boundaries
     EditorView.domEventHandlers({
       compositionstart(_event, view) {
@@ -185,11 +195,19 @@ export function createCMEditor(
         if (cmInstance) {
           const vimState = (cmInstance as any).state?.vim;
           if (vimState && !vimState.insertMode) {
+            normalModeComposing = true;
             view.contentDOM.blur();
-            setTimeout(() => view.focus(), 10);
+            setTimeout(() => {
+              normalModeComposing = false;
+              view.focus();
+            }, 10);
             return true;
           }
         }
+        return false;
+      },
+      compositionend() {
+        normalModeComposing = false;
         return false;
       },
       keydown(event, view) {

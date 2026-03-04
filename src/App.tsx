@@ -419,7 +419,7 @@ const App: Component = () => {
       autoSaveDebounceMs: 800,
       filePath: tab.filePath,
       initialContent,
-      skipAutoSave: tab.isUntitled,
+      skipAutoSave: true,
       onPreviewUpdate: (newHtml) => setHtml(newHtml),
       onSaveComplete: () => {
         setSaveNotification({ text: "Saved", type: "success" });
@@ -564,7 +564,7 @@ const App: Component = () => {
     const fileName = filePath.split(/[\\/]/).pop() || filePath;
     tabStore.promoteToFile(tab.id, filePath, fileName);
 
-    // Recreate SyncEngine with full auto-save
+    // Recreate SyncEngine for promoted file tab
     syncEngineRef?.destroy();
     const promoted = tabStore.activeTab();
     if (promoted) {
