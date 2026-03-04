@@ -7,6 +7,7 @@ import rehypeExternalLinks from "rehype-external-links";
 import rehypeSlug from "rehype-slug";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import rehypeStringify from "rehype-stringify";
+import rehypeSourceLines from "./rehype-source-lines";
 import type { Root as MdastRoot, Heading, PhrasingContent } from "mdast";
 
 // --- Types ---
@@ -52,6 +53,11 @@ const sanitizeSchema: Schema = {
       ["className"],
       ["style"],
     ],
+    // Allow data-source-line on all block elements for scroll sync
+    "*": [
+      ...(defaultSchema.attributes?.["*"] ?? []),
+      "dataSourceLine",
+    ],
     // Allow id on headings for rehype-slug
     h1: [["id"]],
     h2: [["id"]],
@@ -81,6 +87,7 @@ const baseProcessor = unified()
     target: "_blank",
     rel: ["noopener", "noreferrer"],
   })
+  .use(rehypeSourceLines)
   .use(rehypeSanitize, sanitizeSchema)
   .use(rehypeStringify);
 

@@ -27,6 +27,7 @@ import { createBufferManager } from "./lib/buffer";
 import { createFileWatcher } from "./lib/fileWatcher";
 import { createEditorLazyLoader, type CMEditorInstance } from "./lib/editor";
 import { createSyncEngine, type SyncEngineInstance } from "./lib/sync";
+import { createScrollSync, type ScrollSyncInstance } from "./lib/scroll-sync";
 import type { InputContent, CliArgs } from "./lib/types";
 import Preview from "./components/Preview";
 import TOCPanel from "./components/TOCPanel";
@@ -811,6 +812,54 @@ const App: Component = () => {
   const SplitContent = () => {
     const modules = lazyLoader.getModules();
     if (!modules) return null;
+
+    let splitPreviewRef: HTMLDivElement | undefined;
+    let scrollSyncRef: ScrollSyncInstance | null = null;
+
+    const handleSplitEditorReady = (editor: CMEditorInstance) => {
+      handleEditorReady(editor);
+
+      // Initial sync: move editor cursor to match current preview scroll
+      if (splitPreviewRef && scrollSyncRef) {
+        // Wait for preview DOM to be ready
+        requestAnimationFrame(() => {
+          const line = scrollSyncRef?.getLineFromScroll();
+          if (line && line > 1) {
+            const view = editor.getView();
+            if (view) {
+              const doc = view.state.doc;
+              if (line <= doc.lines) {
+                const pos = doc.line(line).from;
+                view.dispatch({
+                  selection: { anchor: pos },
+                  scrollIntoView: true,
+                });
+              }
+            }
+          }
+        });
+      }
+    };
+
+    const handleSplitCursorChange = (pos: { line: number; col: number }) => {
+      setCursorPosition(pos);
+      scrollSyncRef?.syncToLine(pos.line);
+    };
+
+    // Initialize scroll sync after preview mounts
+    const initScrollSync = (el: HTMLDivElement) => {
+      splitPreviewRef = el;
+      scrollSyncRef = createScrollSync({
+        getPreviewContainer: () => splitPreviewRef ?? null,
+      });
+    };
+
+    // Cleanup on unmount
+    onCleanup(() => {
+      scrollSyncRef?.destroy();
+      scrollSyncRef = null;
+    });
+
     return (
       <div class="flex h-full flex-col">
         <div class="flex-1 min-h-0">
@@ -821,14 +870,20 @@ const App: Component = () => {
                 initialContent={markdown()}
                 onContentChange={handleEditorChange}
                 onVimModeChange={setVimMode}
-                onCursorChange={setCursorPosition}
+                onCursorChange={handleSplitCursorChange}
                 onSaveCommand={handleSave}
                 onSaveQuitCommand={handleSaveQuit}
                 onQuitCommand={handleQuit}
-                onEditorReady={handleEditorReady}
+                onEditorReady={handleSplitEditorReady}
               />
             }
-            right={<Preview html={html()} />}
+            right={
+              <Preview
+                html={html()}
+                ref={initScrollSync}
+                onScroll={() => scrollSyncRef?.notifyManualScroll()}
+              />
+            }
           />
         </div>
         <StatusBar
