@@ -4,6 +4,7 @@
  * - Manages a list of open tabs with active tab tracking
  * - Each tab holds file path, content, dirty state, and scroll position
  * - Prevents duplicate tabs (same filePath)
+ * - Supports untitled (unsaved) tabs with Save As promotion
  * - Max 20 tabs
  */
 
@@ -16,7 +17,7 @@ import { createSignal, type Accessor } from "solid-js";
 export interface Tab {
   /** Unique tab identifier (filePath or generated id) */
   id: string;
-  /** Absolute file path */
+  /** Absolute file path (empty string for untitled tabs) */
   filePath: string;
   /** Display name (file name only) */
   fileName: string;
@@ -26,6 +27,8 @@ export interface Tab {
   isDirty: boolean;
   /** Saved scroll position for restoration on tab switch */
   scrollPosition: number;
+  /** Whether this tab is an untitled buffer (no file on disk) */
+  isUntitled: boolean;
 }
 
 export interface TabStore {
@@ -37,6 +40,10 @@ export interface TabStore {
   activeTab: Accessor<Tab | null>;
   /** Open a file in a new tab or switch to existing */
   openTab(filePath: string, fileName: string, content: string): void;
+  /** Create a new untitled tab with empty content. Returns tab id. */
+  createUntitledTab(): string;
+  /** Promote an untitled tab to a file tab */
+  promoteToFile(id: string, filePath: string, fileName: string): void;
   /** Close a tab by id. Returns true if tabs remain, false if all closed. */
   closeTab(id: string): boolean;
   /** Switch to a tab by id */
@@ -70,6 +77,9 @@ const MAX_TABS = 20;
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
+
+/** Module-level counter for untitled tabs (never reused) */
+let untitledCounter = 0;
 
 export function createTabStore(): TabStore {
   const [tabs, setTabs] = createSignal<Tab[]>([]);
@@ -113,10 +123,53 @@ export function createTabStore(): TabStore {
       content,
       isDirty: false,
       scrollPosition: 0,
+      isUntitled: false,
     };
 
     setTabs([...current, newTab]);
     setActiveTabId(newTab.id);
+  }
+
+  function createUntitledTab(): string {
+    const current = tabs();
+
+    // Check max tab limit
+    if (current.length >= MAX_TABS) {
+      console.warn(`Tab limit reached (${MAX_TABS}). Close a tab before opening a new one.`);
+      return "";
+    }
+
+    untitledCounter++;
+    const id = `untitled-${untitledCounter}`;
+    const fileName = `Untitled-${untitledCounter}`;
+
+    const newTab: Tab = {
+      id,
+      filePath: "",
+      fileName,
+      content: "",
+      isDirty: false,
+      scrollPosition: 0,
+      isUntitled: true,
+    };
+
+    setTabs([...current, newTab]);
+    setActiveTabId(id);
+    return id;
+  }
+
+  function promoteToFile(id: string, filePath: string, fileName: string): void {
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.id === id
+          ? { ...t, id: filePath, filePath, fileName, isUntitled: false, isDirty: false }
+          : t
+      )
+    );
+    // Update activeTabId if promoting the active tab
+    if (activeTabId() === id) {
+      setActiveTabId(filePath);
+    }
   }
 
   function closeTab(id: string): boolean {
@@ -204,6 +257,8 @@ export function createTabStore(): TabStore {
     activeTabId,
     activeTab,
     openTab,
+    createUntitledTab,
+    promoteToFile,
     closeTab,
     switchTab,
     nextTab,
