@@ -31,6 +31,15 @@ export function initKeyboardHandler() {
       return;
     }
 
+    // Vim-style :p sequence to print
+    if (colonPressed && e.key === "p") {
+      e.preventDefault();
+      colonPressed = false;
+      clearTimeout(colonTimeout);
+      window.print();
+      return;
+    }
+
     // Any other key resets the :q sequence
     if (e.key !== "Shift" && e.key !== ":") {
       colonPressed = false;
