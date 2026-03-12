@@ -65,10 +65,67 @@ jobs:
             ## Install
 
             ```sh
-            brew install gene/tap/kusa
+            brew install kaze-jp/tap/kusa
             ```
 
             Or download the `.dmg` below for manual installation.
           releaseDraft: true
           prerelease: false
           args: --target ${{ matrix.target }}
+
+  update-homebrew:
+    needs: release
+    runs-on: macos-latest
+    steps:
+      - name: Wait for release assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          # Wait for both DMG assets to be available (max 5 min)
+          for i in $(seq 1 30); do
+            ASSETS=$(gh release view "$TAG" --repo "${{ github.repository }}" --json assets -q '.assets[].name')
+            if echo "$ASSETS" | grep -q "aarch64" && echo "$ASSETS" | grep -q "x86_64\|x64"; then
+              echo "All assets found"
+              break
+            fi
+            echo "Waiting for assets... ($i/30)"
+            sleep 10
+          done
+
+      - name: Download DMGs and compute checksums
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download "$TAG" --repo "${{ github.repository }}" --pattern "*.dmg" --dir ./dmgs
+          ls -la ./dmgs/
+
+          # Find and checksum each DMG
+          ARM_DMG=$(ls ./dmgs/*aarch64*.dmg 2>/dev/null || ls ./dmgs/*arm64*.dmg 2>/dev/null)
+          INTEL_DMG=$(ls ./dmgs/*x86_64*.dmg 2>/dev/null || ls ./dmgs/*x64*.dmg 2>/dev/null)
+
+          ARM_SHA=$(shasum -a 256 "$ARM_DMG" | awk '{print $1}')
+          INTEL_SHA=$(shasum -a 256 "$INTEL_DMG" | awk '{print $1}')
+
+          echo "ARM_SHA=$ARM_SHA" >> $GITHUB_ENV
+          echo "INTEL_SHA=$INTEL_SHA" >> $GITHUB_ENV
+
+      - name: Update Homebrew tap
+        env:
+          GH_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+        run: |
+          git clone https://x-access-token:${GH_TOKEN}@github.com/kaze-jp/homebrew-tap.git /tmp/homebrew-tap
+          cd /tmp/homebrew-tap
+
+          sed -i '' "s/version \".*\"/version \"$VERSION\"/" Casks/kusa.rb
+          sed -i '' "s/arm:   \".*\"/arm:   \"$ARM_SHA\"/" Casks/kusa.rb
+          sed -i '' "s/intel: \".*\"/intel: \"$INTEL_SHA\"/" Casks/kusa.rb
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: update kusa to $VERSION"
+          git push
