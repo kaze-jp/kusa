@@ -9,7 +9,7 @@ Built with [Tauri v2](https://v2.tauri.app/) (SolidJS + Rust). No Electron, no b
 ### Homebrew (macOS)
 
 ```sh
-brew install gene/tap/kusa
+brew install kaze-jp/tap/kusa
 ```
 
 ### Manual install (macOS)
