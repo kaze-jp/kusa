@@ -73,6 +73,22 @@ kusa https://raw.githubusercontent.com/user/repo/main/README.md
 - **AI Context Aware** -- CLAUDE.md, AGENTS.md, .cursorrules support
 - **Lightweight** -- Native app, no Electron
 
+## Claude Code Integration
+
+kusa ships with a Claude Code skill and auto-launch config. To set up:
+
+```sh
+# Copy the /kusa slash command
+cp -r integrations/claude-code/commands/ ~/.claude/commands/
+
+# Append the auto-launch rules to your global CLAUDE.md
+cat integrations/claude-code/CLAUDE.md >> ~/.claude/CLAUDE.md
+```
+
+Now you can:
+- `/kusa README.md` — open a file in kusa from Claude Code
+- Claude will automatically open kusa when generating markdown reports, docs, or specs
+
 ## Development
 
 ```sh
