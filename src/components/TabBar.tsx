@@ -8,6 +8,7 @@
  * - Horizontal scroll overflow
  * - "+" button to create untitled tabs
  * - Dark theme styling
+ * - Pointer-event based drag & drop reordering (works reliably in Tauri WebView)
  */
 
 import { For, Show, createSignal, type Component } from "solid-js";
@@ -27,9 +28,67 @@ interface TabBarProps {
   onOpenFilePicker?: () => void;
 }
 
+/** Minimum px movement before drag starts */
+const DRAG_THRESHOLD = 5;
+
 const TabBar: Component<TabBarProps> = (props) => {
   const [dragIndex, setDragIndex] = createSignal<number | null>(null);
   const [dropIndex, setDropIndex] = createSignal<number | null>(null);
+
+  // Refs for pointer-based drag
+  let tabRefs: HTMLButtonElement[] = [];
+  let startX = 0;
+  let isDragging = false;
+  let pendingDragIndex: number | null = null;
+
+  function handlePointerDown(e: PointerEvent, index: number) {
+    // Only left button, ignore close button clicks
+    if (e.button !== 0) return;
+    if ((e.target as HTMLElement).closest("[data-close-btn]")) return;
+
+    pendingDragIndex = index;
+    startX = e.clientX;
+    isDragging = false;
+
+    const onPointerMove = (ev: PointerEvent) => {
+      if (!isDragging && Math.abs(ev.clientX - startX) >= DRAG_THRESHOLD) {
+        isDragging = true;
+        setDragIndex(pendingDragIndex);
+      }
+      if (!isDragging) return;
+
+      // Find which tab the pointer is over
+      for (let i = 0; i < tabRefs.length; i++) {
+        const rect = tabRefs[i]?.getBoundingClientRect();
+        if (!rect) continue;
+        if (ev.clientX >= rect.left && ev.clientX < rect.right) {
+          setDropIndex(i);
+          break;
+        }
+      }
+    };
+
+    const onPointerUp = () => {
+      document.removeEventListener("pointermove", onPointerMove);
+      document.removeEventListener("pointerup", onPointerUp);
+
+      if (isDragging) {
+        const from = dragIndex();
+        const to = dropIndex();
+        if (from !== null && to !== null && from !== to) {
+          props.onTabMove?.(from, to);
+        }
+      }
+
+      isDragging = false;
+      pendingDragIndex = null;
+      setDragIndex(null);
+      setDropIndex(null);
+    };
+
+    document.addEventListener("pointermove", onPointerMove);
+    document.addEventListener("pointerup", onPointerUp);
+  }
 
   return (
     <div class="flex h-9 flex-shrink-0 items-end overflow-x-auto bg-zinc-900 border-b border-zinc-700/50 scrollbar-hide">
@@ -60,40 +119,14 @@ const TabBar: Component<TabBarProps> = (props) => {
 
           return (
             <button
+              ref={(el) => { tabRefs[index()] = el; }}
               class="group relative flex h-8 items-center gap-1.5 border-r border-zinc-700/30 px-3 text-xs transition-colors select-none whitespace-nowrap"
               classList={{
                 "bg-zinc-800 text-zinc-200": isActive(),
                 "bg-zinc-900 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50": !isActive(),
                 "opacity-50": dragIndex() === index(),
               }}
-              draggable={true}
-              onDragStart={(e) => {
-                setDragIndex(index());
-                e.dataTransfer!.effectAllowed = "move";
-                e.dataTransfer!.setData("text/plain", String(index()));
-              }}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.dataTransfer!.dropEffect = "move";
-                setDropIndex(index());
-              }}
-              onDragLeave={() => {
-                setDropIndex(null);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                const from = dragIndex();
-                const to = index();
-                if (from !== null && from !== to) {
-                  props.onTabMove?.(from, to);
-                }
-                setDragIndex(null);
-                setDropIndex(null);
-              }}
-              onDragEnd={() => {
-                setDragIndex(null);
-                setDropIndex(null);
-              }}
+              onPointerDown={(e) => handlePointerDown(e, index())}
               onClick={() => props.onTabClick(tab.id)}
               title={tab.isUntitled ? tab.fileName : tab.filePath}
             >
@@ -113,6 +146,7 @@ const TabBar: Component<TabBarProps> = (props) => {
 
               {/* Close button */}
               <span
+                data-close-btn
                 class="ml-1 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded opacity-0 transition-opacity hover:bg-zinc-600 group-hover:opacity-100"
                 classList={{
                   "opacity-100": isActive(),
