@@ -24,12 +24,16 @@ description: Release a new version of kusa (bump, build, GitHub release, Homebre
 `git log` で前バージョンからの変更を確認し、Added / Fixed / Changed に分類して記載。
 末尾のリンク一覧にも新バージョンを追加。
 
-### 3. コミット + push
+### 3. コミット + PR マージ
 
 ```
+git checkout -b release/X.Y.Z
 git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml CHANGELOG.md
 git commit -m "chore: bump version to X.Y.Z"
-git push origin main
+git push -u origin release/X.Y.Z
+gh pr create --title "chore: bump version to X.Y.Z" --body "Release X.Y.Z"
+gh pr merge --merge
+git checkout main && git pull origin main
 ```
 
 ### 4. Tauri ビルド
@@ -42,7 +46,7 @@ bun run tauri build
 - `src-tauri/target/release/bundle/macos/kusa.app`
 - `src-tauri/target/release/bundle/dmg/kusa_X.Y.Z_aarch64.dmg`
 
-ビルドで `Cargo.lock` や `src-tauri/gen/schemas/` が変更された場合は追加コミット + push する。
+ビルドで `Cargo.lock` や `src-tauri/gen/schemas/` が変更された場合は、ブランチを作って追加コミット → PR → マージ → main に戻る。
 
 ### 5. GitHub Release 作成
 
@@ -76,13 +80,10 @@ git commit -m "chore: update kusa cask to vX.Y.Z"
 git push origin main
 ```
 
-### 7. 動作確認
-
-ユーザーに以下を案内:
+### 7. ローカル更新
 
 ```sh
-brew upgrade kusa
-# または新規: brew install kaze-jp/tap/kusa
+brew reinstall kaze-jp/tap/kusa
 kusa --version  # → kusa X.Y.Z
 ```
 
