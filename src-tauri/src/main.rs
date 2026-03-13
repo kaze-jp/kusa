@@ -18,12 +18,24 @@ fn main() {
     // Piped stdin (e.g. `cat file | kusa`) is NOT a terminal, so it runs directly.
     #[cfg(all(not(debug_assertions), target_os = "macos"))]
     {
-        use std::io::IsTerminal;
         let args: Vec<String> = std::env::args().collect();
         let already_launched = args.iter().any(|a| a == "--launched");
-        let is_tty = std::io::stdin().is_terminal();
 
-        if !already_launched && is_tty {
+        // Check if stdin is a pipe (actual piped content like `cat file | kusa`).
+        // /dev/null and terminals are NOT pipes, so we detach in both cases.
+        let stdin_is_pipe = {
+            use std::os::unix::io::AsRawFd;
+            unsafe {
+                let mut stat: libc::stat = std::mem::zeroed();
+                if libc::fstat(std::io::stdin().as_raw_fd(), &mut stat) == 0 {
+                    (stat.st_mode & libc::S_IFMT) == libc::S_IFIFO
+                } else {
+                    false
+                }
+            }
+        };
+
+        if !already_launched && !stdin_is_pipe {
             if let Ok(exe) = std::env::current_exe() {
                 let exe_str = exe.to_string_lossy().to_string();
                 if let Some(app_idx) = exe_str.find(".app/") {
