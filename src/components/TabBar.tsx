@@ -13,6 +13,7 @@
 
 import { For, Show, createSignal, type Component } from "solid-js";
 import type { Tab } from "../lib/tabStore";
+import type { TabLabel } from "../lib/tabLabelResolver";
 import type { Accessor } from "solid-js";
 
 interface TabBarProps {
@@ -22,6 +23,7 @@ interface TabBarProps {
   onTabClose: (id: string) => void;
   onNewTab: () => void;
   onTabMove?: (fromIndex: number, toIndex: number) => void;
+  tabLabels?: Accessor<Map<string, TabLabel>>;
   isMaxTabs: boolean;
   hasDir?: boolean;
   onShowFileList?: () => void;
@@ -139,9 +141,20 @@ const TabBar: Component<TabBarProps> = (props) => {
                 <span class="h-2 w-2 rounded-full bg-amber-400 flex-shrink-0" />
               </Show>
 
-              {/* File name */}
+              {/* File name with optional directory prefix */}
               <span class="max-w-[160px] truncate">
-                {tab.fileName}
+                {(() => {
+                  const label = props.tabLabels?.()?.get(tab.id);
+                  if (label && label.prefix) {
+                    return (
+                      <>
+                        <span class="text-zinc-500">{label.prefix}/</span>
+                        {label.fileName}
+                      </>
+                    );
+                  }
+                  return tab.fileName;
+                })()}
               </span>
 
               {/* Close button */}

@@ -30,6 +30,7 @@ import { createEditorLazyLoader, type CMEditorInstance } from "./lib/editor";
 import { createSyncEngine, type SyncEngineInstance } from "./lib/sync";
 import { createScrollSync, type ScrollSyncInstance } from "./lib/scroll-sync";
 import { createBufferSplitStore } from "./lib/bufferSplitStore";
+import { computeTabLabels } from "./lib/tabLabelResolver";
 import type { InputContent, CliArgs } from "./lib/types";
 import type { Tab } from "./lib/tabStore";
 import Preview from "./components/Preview";
@@ -79,6 +80,7 @@ const App: Component = () => {
 
   // Tab store
   const tabStore = createTabStore();
+  const tabLabels = () => computeTabLabels(tabStore.tabs());
 
   // Buffer split store (nvim-like vsplit)
   const bufferSplit = createBufferSplitStore();
@@ -1367,6 +1369,7 @@ const App: Component = () => {
         onTabClose={handleTabClose}
         onNewTab={handleNewTab}
         onTabMove={(from, to) => tabStore.moveTab(from, to)}
+        tabLabels={tabLabels}
         isMaxTabs={tabStore.tabCount() >= 20}
         hasDir={!!dirPath() && fileList().length > 0}
         onShowFileList={() => setViewMode("file-list")}
