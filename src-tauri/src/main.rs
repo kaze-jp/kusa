@@ -11,21 +11,33 @@ fn main() {
         }
     }
 
-    // In release builds on macOS, if launched from a terminal (not via `open`),
-    // relaunch via `open` so the CLI returns immediately.
-    // Piped stdin (e.g. `cat file | kusa`) is NOT a terminal, so it goes through normally.
+    // In release builds on macOS, relaunch via `open` so the CLI returns immediately.
+    // Uses a hidden --launched flag to prevent infinite relaunch loops:
+    //   - First invocation (from terminal): no flag → relaunch via `open -a` → return
+    //   - Second invocation (via `open`): --launched present → skip relaunch → run app
+    // Piped stdin (e.g. `cat file | kusa`) is NOT a terminal, so it runs directly.
     #[cfg(all(not(debug_assertions), target_os = "macos"))]
     {
         use std::io::IsTerminal;
-        if std::io::stdin().is_terminal() {
+        let args: Vec<String> = std::env::args().collect();
+        let already_launched = args.iter().any(|a| a == "--launched");
+        let is_tty = std::io::stdin().is_terminal();
+
+        if !already_launched && is_tty {
             if let Ok(exe) = std::env::current_exe() {
                 let exe_str = exe.to_string_lossy().to_string();
                 if let Some(app_idx) = exe_str.find(".app/") {
                     let app_path = &exe_str[..app_idx + 4];
-                    let args: Vec<String> = std::env::args().skip(1).collect();
+                    // Collect user args (skip program name), exclude internal flags
+                    let user_args: Vec<String> = args
+                        .iter()
+                        .skip(1)
+                        .filter(|a| a.as_str() != "--launched")
+                        .cloned()
+                        .collect();
 
                     // Resolve relative file paths to absolute before relaunching
-                    let resolved_args: Vec<String> = args
+                    let resolved_args: Vec<String> = user_args
                         .iter()
                         .map(|arg| {
                             if !arg.starts_with('-') {
@@ -41,11 +53,9 @@ fn main() {
                         .collect();
 
                     let mut cmd = std::process::Command::new("open");
-                    cmd.arg("-a").arg(app_path);
-                    if !resolved_args.is_empty() {
-                        cmd.arg("--args");
-                        cmd.args(&resolved_args);
-                    }
+                    cmd.arg("-a").arg(app_path).arg("--args");
+                    cmd.arg("--launched");
+                    cmd.args(&resolved_args);
                     let _ = cmd.spawn();
                     return;
                 }
