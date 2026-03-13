@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.2] - 2026-03-13
+
+### Added
+
+- **コピーボタン**: プレビュー右上にフローティングコピーボタンを追加。ホバーで表示、クリックでリッチテキストコピー。
+
+### Fixed
+
+- **CLI プロセスが残り続ける問題**: `kusa file.md` 実行後にターミナルプロセスがブロックし続けるバグを修正。`--launched` フラグによるリラウンチループ防止を導入。
+
 ## [0.3.0] - 2026-03-13
 
 ### Added
@@ -49,6 +59,7 @@ All notable changes to this project will be documented in this file.
 - IME 入力の vim normal モードでのブロック
 - Homebrew tap 経由のインストール
 
+[0.3.2]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.2
 [0.3.0]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.0
 [0.2.0]: https://github.com/kaze-jp/kusa/releases/tag/v0.2.0
 [0.1.0]: https://github.com/kaze-jp/kusa/releases/tag/v0.1.0
