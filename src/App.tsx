@@ -49,6 +49,8 @@ import DropZone from "./components/DropZone";
 import EditorPane from "./components/EditorPane";
 import SplitLayout from "./components/SplitLayout";
 import StatusBar from "./components/StatusBar";
+import ContextMenu from "./components/ContextMenu";
+import type { ContextMenuItem } from "./components/ContextMenu";
 import {
   initWindowMode,
   isPeekMode,
@@ -1001,6 +1003,22 @@ const App: Component = () => {
     );
   }
 
+  // Copy raw markdown source text
+  function copyMarkdownSource() {
+    const md = markdown();
+    if (!md) return;
+    navigator.clipboard.writeText(md).then(
+      () => setSaveNotification({ text: "Copied markdown", type: "success" }),
+      () => setSaveNotification({ text: "Copy failed", type: "error" }),
+    );
+  }
+
+  // Context menu items for preview area
+  const previewContextMenuItems: ContextMenuItem[] = [
+    { label: "Copy Markdown", onClick: copyMarkdownSource },
+    { label: "Copy as Rich Text", onClick: copyPreviewAsRichText, separator: true },
+  ];
+
   // Handle heading select from picker
   function handleHeadingSelect(id: string) {
     actions.jumpToHeading(id);
@@ -1144,6 +1162,7 @@ const App: Component = () => {
               <path d="M10.5 5.5V3.5a1.5 1.5 0 0 0-1.5-1.5H3.5A1.5 1.5 0 0 0 2 3.5V9a1.5 1.5 0 0 0 1.5 1.5h2" />
             </svg>
           </button>
+          <ContextMenu items={previewContextMenuItems} containerRef={previewRef} />
         </div>
       </div>
       <HeadingPicker
@@ -1243,6 +1262,7 @@ const App: Component = () => {
     // Initialize scroll sync after preview mounts
     const initScrollSync = (el: HTMLDivElement) => {
       splitPreviewRef = el;
+      setPreviewRef(el); // Enable copyPreviewAsRichText
       scrollSyncRef = createScrollSync({
         getPreviewContainer: () => splitPreviewRef ?? null,
       });
@@ -1272,10 +1292,22 @@ const App: Component = () => {
               />
             }
             right={
-              <Preview
-                html={html()}
-                ref={initScrollSync}
-              />
+              <div class="preview-wrapper relative h-full">
+                <Preview
+                  html={html()}
+                  ref={initScrollSync}
+                />
+                <button
+                  class="copy-preview-btn"
+                  title="Copy as rich text (⌘⇧C)"
+                  onClick={copyPreviewAsRichText}
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" />
+                    <path d="M10.5 5.5V3.5a1.5 1.5 0 0 0-1.5-1.5H3.5A1.5 1.5 0 0 0 2 3.5V9a1.5 1.5 0 0 0 1.5 1.5h2" />
+                  </svg>
+                </button>
+              </div>
             }
           />
         </div>

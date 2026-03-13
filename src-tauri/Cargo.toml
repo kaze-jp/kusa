@@ -1,6 +1,6 @@
 [package]
 name = "kusa"
-version = "0.3.2"
+version = "0.3.3"
 description = "AI開発者のためのMarkdownエディター"
 authors = ["kaze-jp"]
 edition = "2021"

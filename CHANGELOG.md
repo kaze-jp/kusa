@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.3] - 2026-03-13
+
+### Added
+
+- **Split view コピーボタン**: Split view（Ctrl+E）のプレビューペインにもフローティングコピーボタンを表示。ホバーで表示、クリック or `⌘⇧C` でリッチテキストコピー。
+
 ## [0.3.2] - 2026-03-13
 
 ### Added
@@ -59,6 +65,7 @@ All notable changes to this project will be documented in this file.
 - IME 入力の vim normal モードでのブロック
 - Homebrew tap 経由のインストール
 
+[0.3.3]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.3
 [0.3.2]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.2
 [0.3.0]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.0
 [0.2.0]: https://github.com/kaze-jp/kusa/releases/tag/v0.2.0
