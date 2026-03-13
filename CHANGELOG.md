@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.6] - 2026-03-13
+
+### Fixed
+
+- **CLI プロセスが終了しない問題**: stdin が `/dev/null` にリダイレクトされた場合（Claude Code の Bash ツール等）、`is_terminal()` が false になり auto-detach がスキップされてプロセスがブロックし続けるバグを修正。`libc::fstat` で stdin が実際のパイプ（FIFO）かどうかを判定し、パイプ入力時のみ直接実行、それ以外は detach するように変更。
+
 ## [0.3.5] - 2026-03-13
 
 ### Fixed
@@ -77,6 +83,7 @@ All notable changes to this project will be documented in this file.
 - IME 入力の vim normal モードでのブロック
 - Homebrew tap 経由のインストール
 
+[0.3.6]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.6
 [0.3.5]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.5
 [0.3.4]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.4
 [0.3.3]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.3
