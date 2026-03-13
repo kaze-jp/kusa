@@ -1,58 +1,35 @@
-# Research & Design Decisions Template
+# {{FEATURE_NAME}} — Research Notes
 
----
-**Purpose**: Capture discovery findings, architectural investigations, and rationale that inform the technical design.
+> Technical research and investigation notes
 
-**Usage**:
-- Log research activities and outcomes during the discovery phase.
-- Document design decision trade-offs that are too detailed for `design.md`.
-- Provide references and evidence for future audits or reuse.
----
+## Research Questions
 
-## Summary
-- **Feature**: `<feature-name>`
-- **Discovery Scope**: New Feature / Extension / Simple Addition / Complex Integration
-- **Key Findings**:
-  - Finding 1
-  - Finding 2
-  - Finding 3
+1. {{question}}
 
-## Research Log
-Document notable investigation steps and their outcomes. Group entries by topic for readability.
+## Findings
 
-### [Topic or Question]
-- **Context**: What triggered this investigation?
-- **Sources Consulted**: Links, documentation, API references, benchmarks
-- **Findings**: Concise bullet points summarizing the insights
-- **Implications**: How this affects architecture, contracts, or implementation
+### {{Topic 1}}
 
-_Repeat the subsection for each major topic._
+- **Source:** {{link or reference}}
+- **Summary:** {{findings}}
+- **Implications for design:** {{impact}}
 
-## Architecture Pattern Evaluation
-List candidate patterns or approaches that were considered.
+### {{Topic 2}}
 
-| Option | Description | Strengths | Risks / Limitations | Notes |
-|--------|-------------|-----------|---------------------|-------|
-| | | | | |
+- **Source:** {{link or reference}}
+- **Summary:** {{findings}}
+- **Implications for design:** {{impact}}
 
-## Design Decisions
-Record major decisions that influence `design.md`.
+## Proof of Concept
 
-### Decision: `<Title>`
-- **Context**: Problem or requirement driving the decision
-- **Alternatives Considered**:
-  1. Option A — short description
-  2. Option B — short description
-- **Selected Approach**: What was chosen and how it works
-- **Rationale**: Why this approach fits the current project context
-- **Trade-offs**: Benefits vs. compromises
-- **Follow-up**: Items to verify during implementation or testing
+```typescript
+// POC code if applicable
+```
 
-_Repeat the subsection for each decision._
+## Recommendations
 
-## Risks & Mitigations
-- Risk 1 — Proposed mitigation
-- Risk 2 — Proposed mitigation
+- {{recommendation}}
 
-## References
-- [Title](https://example.com) — brief note on relevance
+## Open Items
+
+- {{item}}

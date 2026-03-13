@@ -30,6 +30,7 @@
         "unified": "^11.0.5",
       },
       "devDependencies": {
+        "@kaze-jp/konbini": "^0.2.4",
         "@tailwindcss/vite": "^4.2.1",
         "@tauri-apps/cli": "^2.10.0",
         "@types/mdast": "^4.0.4",
@@ -189,6 +190,8 @@
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.5", "", {}, "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og=="],
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "3.1.2", "@jridgewell/sourcemap-codec": "1.5.5" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
+
+    "@kaze-jp/konbini": ["@kaze-jp/konbini@0.2.4", "", { "bin": { "konbini": "dist/cli.js" } }, "sha512-SVkdUQJe5JuF/G+EIm21iJlUZC7nPbIWEgWJcrBMBfLCLcNTRJcI7Gr363oINUfDKLEWsCiYHSzkQFqeGzllCg=="],
 
     "@lezer/common": ["@lezer/common@1.5.1", "", {}, "sha512-6YRVG9vBkaY7p1IVxL4s44n5nUnaNnGM2/AckNgYOnxTG2kWh1vR8BMxPseWPjRNpb5VtXnMpeYAEAADoRV1Iw=="],
 

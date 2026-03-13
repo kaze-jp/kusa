@@ -1,98 +1,75 @@
----
-description: Execute spec tasks using TDD methodology
-allowed-tools: Bash, Read, Write, Edit, MultiEdit, Grep, Glob, LS, WebFetch, WebSearch
-argument-hint: <feature-name> [task-numbers]
----
+# Start Implementation
 
-# Implementation Task Executor
+Begin implementing approved tasks using TDD in an isolated worktree. This is the manual implementation command — for fully autonomous execution (implementation → PR → review → merge), use `/kiro:ao-run` instead.
 
-<background_information>
-- **Mission**: Execute implementation tasks using Test-Driven Development methodology based on approved specifications
-- **Success Criteria**:
-  - All tests written before implementation code
-  - Code passes all tests with no regressions
-  - Tasks marked as completed in tasks.md
-  - Implementation aligns with design and requirements
-</background_information>
+## Usage
 
-<instructions>
-## Core Task
-Execute implementation tasks for feature **$1** using Test-Driven Development.
+```
+/kiro:spec-impl <feature-name> [task-numbers]
+```
 
-## Execution Steps
+- `/kiro:spec-impl my-feature` — all pending tasks
+- `/kiro:spec-impl my-feature 1.1` — single task
+- `/kiro:spec-impl my-feature 1,2,3` — specific tasks
 
-### Step 1: Load Context
+## Instructions
 
-**Read all necessary context**:
-- `.kiro/specs/$1/spec.json`, `requirements.md`, `design.md`, `tasks.md`
-- **Entire `.kiro/steering/` directory** for complete project memory
+1. **Validate prerequisites**:
+   - `.kiro/specs/$FEATURE_NAME/tasks.md` must exist. If not → `/kiro:spec-tasks` first.
+   - `.kiro/specs/$FEATURE_NAME/design.md` must exist.
+   - `.kiro/specs/$FEATURE_NAME/requirements.md` must exist.
 
-**Validate approvals**:
-- Verify tasks are approved in spec.json (stop if not, see Safety & Fallback)
+2. **Read context**:
+   - `.kiro/specs/$FEATURE_NAME/tasks.md` — task definitions, dependencies, `(P)` markers
+   - `.kiro/specs/$FEATURE_NAME/design.md` — API contracts, data models, component design
+   - `.ao/steering/tech.md` — coding standards, patterns
+   - `.ao/steering/structure.md` — file placement conventions
+   - `.ao/ao.yaml` — quality gate commands, git strategy
 
-### Step 2: Select Tasks
+3. **Create worktree**:
+   - Use `/superpowers:using-git-worktrees` to create an isolated worktree
+   - Branch: `<git.branch_prefix><feature-name>`
+   - All implementation happens in the worktree — never on the base branch
 
-**Determine which tasks to execute**:
-- If `$2` provided: Execute specified task numbers (e.g., "1.1" or "1,2,3")
-- Otherwise: Execute all pending tasks (unchecked `- [ ]` in tasks.md)
+4. **Select tasks**:
+   - If task numbers specified → execute those tasks only
+   - Otherwise → execute all pending tasks (`- [ ]` in tasks.md)
+   - Skip already completed tasks (`- [x]`)
+   - Respect dependency ordering
 
-### Step 3: Execute with TDD
+5. **Execute each task with TDD** (invoke `/superpowers:test-driven-development`):
 
-For each selected task, follow Kent Beck's TDD cycle:
+   For each task, follow Kent Beck's TDD cycle:
 
-1. **RED - Write Failing Test**:
-   - Write test for the next small piece of functionality
-   - Test should fail (code doesn't exist yet)
-   - Use descriptive test names
+   - **RED**: Write a failing test that captures the acceptance criteria
+   - **GREEN**: Write the minimum code to make the test pass
+   - **REFACTOR**: Clean up while keeping tests green
+   - **VERIFY**: Run quality gates from `ao.yaml` (typecheck, lint, test, build)
+   - **MARK**: Update `tasks.md` checkbox from `- [ ]` to `- [x]`
 
-2. **GREEN - Write Minimal Code**:
-   - Implement simplest solution to make test pass
-   - Focus only on making THIS test pass
-   - Avoid over-engineering
+6. **After each task**:
+   - Run quality gates to catch regressions
+   - Commit with task ID in message (e.g., `feat(feature): implement task 1.1`)
+   - Update `tasks.md` status
 
-3. **REFACTOR - Clean Up**:
-   - Improve code structure and readability
-   - Remove duplication
-   - Apply design patterns where appropriate
-   - Ensure all tests still pass after refactoring
+7. **Handle failures**:
+   - Use `/superpowers:systematic-debugging` for persistent test failures
+   - If a task cannot be completed as designed, document the blocker
+   - Do not proceed with dependent tasks until blockers are resolved
 
-4. **VERIFY - Validate Quality**:
-   - All tests pass (new and existing)
-   - No regressions in existing functionality
-   - Type check passes (both TypeScript and Rust)
+8. **On completion**, use `/superpowers:finishing-a-development-branch` to:
+   - Verify all tests pass
+   - Choose: merge locally, create PR, keep branch, or discard
 
-5. **MARK COMPLETE**:
-   - Update checkbox from `- [ ]` to `- [x]` in tasks.md
+## Output
 
-## Critical Constraints
-- **TDD Mandatory**: Tests MUST be written before implementation code
-- **Task Scope**: Implement only what the specific task requires
-- **Test Coverage**: All new code must have tests
-- **No Regressions**: Existing tests must continue to pass
-- **Design Alignment**: Implementation must follow design.md specifications
-</instructions>
+- Implemented source files with tests (TDD)
+- Updated `.kiro/specs/<feature-name>/tasks.md` with completion status
 
-## Tool Guidance
-- **Read first**: Load all context before implementation
-- **Test first**: Write tests before code
-- Use **WebSearch/WebFetch** for library documentation when needed
+## Notes
 
-## Output Description
-
-Provide brief summary in the language specified in spec.json:
-
-1. **Tasks Executed**: Task numbers and test results
-2. **Status**: Completed tasks marked in tasks.md, remaining tasks count
-
-**Format**: Concise (under 150 words)
-
-## Safety & Fallback
-
-### Error Scenarios
-- **Tasks Not Approved or Missing Spec Files**: Stop execution, suggest completing previous phases
-- **Test Failures**: Stop implementation, fix failing tests before continuing
-
-### Task Execution
-- `/kiro:spec-impl $1 1.1` - Single task
-- `/kiro:spec-impl $1 1,2,3` - Multiple tasks
-- `/kiro:spec-impl $1` - All pending tasks
+- All work happens in a worktree — never commit directly to the base branch.
+- Always follow the design document; do not improvise architectural decisions.
+- If the design is ambiguous, ask the user rather than guessing.
+- TDD is mandatory — no implementation code before a failing test.
+- For fully autonomous execution (implementation → PR → review → merge), use `/kiro:ao-run` instead.

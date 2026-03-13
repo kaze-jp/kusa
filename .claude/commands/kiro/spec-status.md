@@ -1,73 +1,74 @@
----
-description: Show specification status and progress
-allowed-tools: Bash, Read, Glob, Write, Edit, MultiEdit, Update
-argument-hint: [feature-name]
----
+# Show Spec Status
 
-# Specification Status
+Display the current status of a feature specification, including phase completion and progress.
 
-<background_information>
-- **Mission**: Display comprehensive status and progress for a specification
-- **Success Criteria**:
-  - Show current phase and completion status
-  - Identify next actions and blockers
-  - Provide clear visibility into progress
-</background_information>
+## Usage
 
-<instructions>
-## Core Task
-Generate status report for feature **$1** showing progress across all phases.
+```
+/kiro:spec-status <feature-name>
+```
 
-## Execution Steps
+## Instructions
 
-### Step 1: Load Spec Context
-- Read `.kiro/specs/$1/spec.json` for metadata and phase status
-- Read existing files: `requirements.md`, `design.md`, `tasks.md` (if they exist)
-- Check `.kiro/specs/$1/` directory for available files
+1. **Locate the spec directory** at `.kiro/specs/$FEATURE_NAME/`. If it does not exist, report that no spec exists for this feature.
 
-### Step 2: Analyze Status
+2. **Check each phase** by looking for the corresponding files:
 
-**Parse each phase**:
-- **Requirements**: Count requirements and acceptance criteria
-- **Design**: Check for architecture, components, diagrams
-- **Tasks**: Count completed vs total tasks (parse `- [x]` vs `- [ ]`)
-- **Approvals**: Check approval status in spec.json
+   | Phase | File | Status |
+   |-------|------|--------|
+   | Init | `requirements-init.md` | Exists? |
+   | Requirements | `requirements.md` | Exists? |
+   | Design | `design.md` | Exists? |
+   | Tasks | `tasks.md` | Exists? |
+   | Implementation | (check task completion) | Progress? |
 
-### Step 3: Generate Report
+3. **If `tasks.md` exists**, analyze implementation progress:
+   - Count total tasks
+   - Count completed tasks (checked acceptance criteria)
+   - Count parallelizable tasks remaining
+   - Identify current blockers (tasks with unmet dependencies that are not complete)
+   - Calculate percentage complete
 
-Create report in the language specified in spec.json covering:
-1. **Current Phase & Progress**: Where the spec is in the workflow
-2. **Completion Status**: Percentage complete for each phase
-3. **Task Breakdown**: If tasks exist, show completed/remaining counts
-4. **Next Actions**: What needs to be done next
-5. **Blockers**: Any issues preventing progress
+4. **Check for blockers**:
+   - Open questions in any document
+   - Tasks marked as blocked
+   - Design gaps noted during implementation
 
-## Critical Constraints
-- Use language from spec.json
-- Calculate accurate completion percentages
-- Identify specific next action commands
-</instructions>
+5. **Generate a status report**:
 
-## Tool Guidance
-- **Read**: Load spec.json first, then other spec files as needed
-- **Parse carefully**: Extract completion data from tasks.md checkboxes
-- Use **Glob** to check which spec files exist
+```markdown
+# Spec Status: <feature-name>
 
-## Output Description
+## Phase Progress
+- [x] Init (requirements-init.md)
+- [x] Requirements (requirements.md)
+- [x] Design (design.md)
+- [ ] Tasks (tasks.md)
+- [ ] Implementation
 
-Provide status report in the language specified in spec.json:
+## Current Phase: <phase-name>
+<Details about what needs to happen next>
 
-**Report Structure**:
-1. **Feature Overview**: Name, phase, last updated
-2. **Phase Status**: Requirements, Design, Tasks with completion %
-3. **Task Progress**: If tasks exist, show X/Y completed
-4. **Next Action**: Specific command to run next
-5. **Issues**: Any blockers or missing elements
+## Implementation Progress (if applicable)
+- Total tasks: X
+- Completed: Y / X (Z%)
+- Parallelizable remaining: N
+- Blocked: M
 
-**Format**: Clear, scannable format with emojis (✅/⏳/❌) for status
+## Blockers
+- <blocker description>
 
-## Safety & Fallback
+## Next Steps
+- <recommended next action>
+```
 
-### Error Scenarios
-- **Spec Not Found**: List available spec directories
-- **Incomplete Spec**: Identify missing files and suggest next phase command
+6. **Display the report** to the user.
+
+## Output
+
+- Status report displayed to the user (not written to a file)
+
+## Notes
+
+- If no feature name is provided, list all specs found in `.kiro/specs/` with their statuses.
+- This command is read-only; it does not modify any files.

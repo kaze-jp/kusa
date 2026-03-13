@@ -1,0 +1,162 @@
+# .ao/ao.yaml
+# konbini — AI autonomous development framework configuration
+
+# --- プリセット ---
+# solo:           R1-R3 human, R4-R7 ai, R8 human → downstream: approve-only（推奨デフォルト）
+# solo-full-auto: R1-R3 human, R4-R7 ai, R8 skip → downstream: full-auto
+# team:           R1-R3 human, R4-R7 ai, R8 human → downstream: review-and-approve
+# custom:         個別設定
+preset: solo-full-auto
+schema_version: 1
+
+# --- 自律レベル ---
+autonomy:
+  upstream: manual              # manual（人間が承認）
+  downstream: full-auto    # full-auto | approve-only | review-and-approve
+  auto_merge: true    # downstream承認後に自動マージ
+  bypass_permissions: true      # 推奨ON（自律運転、自己責任）
+
+# --- Git 戦略 ---
+git:
+  strategy: worktree            # worktree（超推奨） | branch
+  base_branch: main             # ベースブランチ（main, develop, 任意のブランチ）
+  lock_base_branch: true        # ベースブランチを直接変更しない（推奨）
+  branch_prefix: konbini/
+
+# --- 推奨スキル（Claude Code 標準プラグイン依存） ---
+skills:
+  # 上流（設計フェーズ）
+  brainstorming: /superpowers:brainstorming
+  writing_plans: /superpowers:writing-plans
+
+  # R4: 実装
+  implementation: /feature-dev:feature-dev
+  tdd: /superpowers:test-driven-development
+  parallel_dispatch: /superpowers:dispatching-parallel-agents
+  subagent_dev: /superpowers:subagent-driven-development
+  worktree: /superpowers:using-git-worktrees
+  debugging: /superpowers:systematic-debugging
+
+  # R5: 統合・検証
+  simplify: /simplify
+  verification: /superpowers:verification-before-completion
+
+  # R6-R7: レビュー
+  code_review: /code-review:code-review
+  requesting_review: /superpowers:requesting-code-review
+  receiving_review: /superpowers:receiving-code-review
+
+  # R8後: 完了
+  finishing_branch: /superpowers:finishing-a-development-branch
+
+# --- スキル依存関係 ---
+dependencies:
+  required_plugins:
+    - name: feature-dev
+      purpose: 実装ガイド
+    - name: code-review
+      purpose: PRレビュー
+    - name: superpowers
+      purpose: simplify, brainstorming, TDD等
+  required_tools:
+    - name: gh
+      purpose: GitHub操作（PR, レビューコメント）
+  fallback: warn
+
+# --- レビューブレイクポイント ---
+reviews:
+  R1_requirements:
+    actor: human
+    description: "要件の承認"
+
+  R2_design:
+    actor: human
+    description: "技術設計の承認"
+
+  R3_tasks:
+    actor: human
+    description: "タスク分解の承認"
+
+  R4_implementation:
+    actor: ai
+    use_team_agents: true
+    tdd: true
+    description: "並列実装（Team Agents + TDD） + 品質ゲート"
+
+  R5_integration:
+    actor: ai
+    description: "統合 + Simplify"
+
+  R6_pr_review:
+    actor: ai
+    skill: /code-review:code-review
+    specialists:
+      - security
+      - quality
+      - frontend
+      - backend
+    auto_select: true
+    memory_inject: true
+    description: "PR作成 + マルチ専門家PRレビュー"
+
+  R7_fix_loop:
+    actor: ai
+    simplify_between: auto
+    max_iterations: 10
+    escalation_trigger:
+      type: same_issue
+      count: 3
+    description: "修正 → simplify(自律) → 再レビュー（approveまで）"
+
+  R8_pre_merge:
+    actor: skip
+    description: "マージ前の最終承認"
+
+  on_escalation: ask_human
+
+# --- 品質ゲート ---
+quality_gates:
+  commands:
+    typecheck: npx tsc --noEmit
+    lint: npm run lint
+    test: npm test
+    build: npm run build
+  treat_warnings_as: pass
+  max_retries: 3
+
+# --- TDD ---
+tdd:
+  enabled: true
+  skill: /superpowers:test-driven-development
+
+# --- Pre-commit Hooks ---
+pre_commit_hooks:
+  recommended:
+    - lint-staged（変更ファイルのみ lint）
+    - type-check（型チェック）
+    - test（関連テストの実行）
+  warn_no_verify: true
+
+# --- Simplify ---
+simplify:
+  skill: /simplify
+  per_task: false
+  required_points:
+    - after_integration
+    - before_pr_review
+  auto_points:
+    - after_review_fixes
+  skip_if_diff_lines_under: 5
+
+# --- レビューコメント（GitHub） ---
+review_comments:
+  enabled: true
+  prefix: "🤖"
+  format: "[ao-{role}]"
+  auto_resolve: true
+  sync_to_memory: true
+
+# --- 学習ループ ---
+memory:
+  enabled: true
+  simplify_threshold: 20

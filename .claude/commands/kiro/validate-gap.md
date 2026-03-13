@@ -1,54 +1,92 @@
----
-description: Analyze implementation gap between requirements and existing codebase
-allowed-tools: Bash, Glob, Grep, Read, Write, Edit, MultiEdit, WebSearch, WebFetch
-argument-hint: <feature-name>
----
+# Gap Analysis
 
-# Implementation Gap Validation
+Perform a gap analysis between the design document and the actual implementation.
 
-<background_information>
-- **Mission**: Analyze the gap between requirements and existing codebase to inform implementation strategy
-- **Success Criteria**:
-  - Comprehensive understanding of existing codebase patterns
-  - Clear identification of missing capabilities
-  - Multiple viable implementation approaches evaluated
-</background_information>
+## Usage
 
-<instructions>
-## Core Task
-Analyze implementation gap for feature **$1** based on approved requirements and existing codebase.
+```
+/kiro:validate-gap <feature-name>
+```
 
-## Execution Steps
+## Instructions
 
-1. **Load Context**:
-   - Read `.kiro/specs/$1/spec.json` and `requirements.md`
-   - **Load ALL steering context**
+1. **Read the spec documents**:
+   - `.kiro/specs/$FEATURE_NAME/design.md`
+   - `.kiro/specs/$FEATURE_NAME/tasks.md`
+   - `.kiro/specs/$FEATURE_NAME/requirements.md`
 
-2. **Read Analysis Guidelines**:
-   - Read `.kiro/settings/rules/gap-analysis.md`
+2. **Inventory the design** by extracting:
+   - All components and their expected file locations
+   - All API contracts and their signatures
+   - All data models and their fields
+   - All specified error handling behaviors
+   - All testing requirements
 
-3. **Execute Gap Analysis**:
-   - Follow gap-analysis.md framework
-   - Analyze existing codebase
-   - Evaluate implementation approaches
+3. **Inventory the implementation** by:
+   - Reading each file referenced in the design
+   - Checking for the existence of all specified components
+   - Comparing actual function signatures against API contracts
+   - Comparing actual data models against design specifications
+   - Checking for test files
 
-4. **Generate Analysis Document**
+4. **Compare design vs implementation**:
 
-## Important Constraints
-- **Information over Decisions**: Provide analysis and options, not final choices
-- **Multiple Options**: Present viable alternatives
-- **Thorough Investigation**: Use tools to deeply understand existing codebase
-</instructions>
+   | Category | Check |
+   |----------|-------|
+   | Files | Do all designed files exist? |
+   | Components | Are all components implemented? |
+   | APIs | Do signatures match contracts? |
+   | Data Models | Do fields and validations match? |
+   | Error Handling | Are all error cases handled? |
+   | Tests | Do required tests exist and pass? |
+   | Behaviors | Are all specified behaviors present? |
 
-## Tool Guidance
-- **Read first**: Load all context before analysis
-- **Grep extensively**: Search codebase for patterns
-- **WebSearch/WebFetch**: Research external dependencies when needed
+5. **Classify gaps**:
+   - **Missing**: Designed but not implemented
+   - **Divergent**: Implemented but differs from design
+   - **Extra**: Implemented but not in design (may be fine)
+   - **Incomplete**: Partially implemented
 
-## Output Description
-1. **Analysis Summary**: 3-5 bullets
-2. **Next Steps**: Guide to design phase
+6. **Generate gap analysis report**:
 
-## Safety & Fallback
-- **Missing Requirements**: Stop, suggest running spec-requirements first
-- **Complex Integration Unclear**: Flag for research in design phase
+```markdown
+# Gap Analysis: <feature-name>
+
+## Summary
+- Design components: X
+- Implemented: Y
+- Missing: Z
+- Divergent: W
+
+## Missing Components
+- [ ] <component> - <designed location>
+
+## Divergent Implementations
+- [ ] <component>: Design says <X>, implementation does <Y>
+
+## Incomplete Implementations
+- [ ] <component>: Missing <specific aspect>
+
+## Extra Implementations
+- <component>: Not in design (review needed)
+
+## Test Coverage
+- Designed tests: X
+- Implemented tests: Y
+- Missing tests: [list]
+
+## Recommendations
+<Prioritized list of actions to close gaps>
+```
+
+7. **Display the report** to the user.
+
+## Output
+
+- Gap analysis report displayed to the user
+
+## Notes
+
+- Divergent implementations are not always bugs; the design may need updating.
+- Extra implementations should be reviewed but are not automatically flagged as issues.
+- Focus on behavioral gaps over stylistic differences.

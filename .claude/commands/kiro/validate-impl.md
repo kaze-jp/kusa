@@ -1,68 +1,84 @@
----
-description: Validate implementation against requirements, design, and tasks
-allowed-tools: Bash, Glob, Grep, Read, LS
-argument-hint: [feature-name] [task-numbers]
----
+# Validate Implementation
 
-# Implementation Validation
+Perform full traceability validation from requirements through design to implementation.
 
-<background_information>
-- **Mission**: Verify that implementation aligns with approved requirements, design, and tasks
-- **Success Criteria**:
-  - All specified tasks marked as completed
-  - Tests exist and pass for implemented functionality
-  - Requirements traceability confirmed
-  - Design structure reflected in implementation
-</background_information>
+## Usage
 
-<instructions>
-## Core Task
-Validate implementation for feature(s) and task(s) based on approved specifications.
+```
+/kiro:validate-impl <feature-name>
+```
 
-## Execution Steps
+## Instructions
 
-### 1. Detect Validation Target
+1. **Read all spec documents**:
+   - `.kiro/specs/$FEATURE_NAME/requirements.md`
+   - `.kiro/specs/$FEATURE_NAME/design.md`
+   - `.kiro/specs/$FEATURE_NAME/tasks.md`
 
-**If no arguments provided**:
-- Scan `.kiro/specs/` for features with completed tasks `[x]`
+   If any are missing, report which files are absent.
 
-**If feature provided**:
-- Detect all completed tasks `[x]` in `.kiro/specs/$1/tasks.md`
+2. **Build the traceability chain**:
+   - Requirements -> Design components (from design traceability section)
+   - Design components -> Tasks (from task traceability section)
+   - Tasks -> Files (from task file lists)
 
-**If both feature and tasks provided**:
-- Validate specified feature and tasks only
+3. **For each requirement**, trace the full chain:
+   - Which design component addresses it?
+   - Which task(s) implement that component?
+   - Which files were created/modified?
+   - Does the implementation actually satisfy the requirement?
 
-### 2. Load Context
+4. **Validate implementation correctness**:
+   - Read each implemented file referenced in tasks
+   - Check that the code matches the design's API contracts
+   - Verify error handling matches specified error cases
+   - Verify data validation matches model specifications
+   - Check that tests exist and cover the requirement
 
-For each detected feature:
-- Read all spec files and steering context
+5. **Check acceptance criteria**:
+   - For each task, verify all acceptance criteria are met
+   - Run tests if possible to confirm passing state
 
-### 3. Execute Validation
+6. **Generate full traceability report**:
 
-For each task, verify:
-- **Task Completion**: Checkbox is `[x]` in tasks.md
-- **Test Coverage**: Tests exist and pass
-- **Requirements Traceability**: EARS requirements covered
-- **Design Alignment**: Design structure reflected in implementation
-- **Regression Check**: Full test suite passes
+```markdown
+# Implementation Validation: <feature-name>
 
-### 4. Generate Report
+## Traceability Matrix
 
-Provide summary with GO/NO-GO decision.
-</instructions>
+| Requirement | Design Component | Task(s) | Files | Status |
+|------------|-----------------|---------|-------|--------|
+| FR-001 | ComponentA | T-001 | src/a.ts | PASS |
+| FR-002 | ComponentB | T-002, T-003 | src/b.ts | FAIL: missing validation |
 
-## Tool Guidance
-- **Read context**: Load all specs and steering before validation
-- **Bash for tests**: Execute `bun test` and `cargo test`
-- **Grep for traceability**: Search codebase for requirement evidence
+## Passing Requirements: X / Y
 
-## Output Description
-1. **Detected Target**: Features and tasks being validated
-2. **Validation Summary**: Brief overview per feature
-3. **Issues**: Validation failures with severity
-4. **Coverage Report**: Requirements/design/task coverage
-5. **Decision**: GO / NO-GO
+## Failing Requirements
+### FR-002: <requirement text>
+- **Expected**: <what should happen>
+- **Actual**: <what the code does>
+- **Fix**: <suggested fix>
 
-## Safety & Fallback
-- **No Implementation Found**: Report "No implementations detected"
-- **Test Command Unknown**: Warn and skip test validation
+## Test Coverage
+- Requirements with tests: X / Y
+- Tests passing: Z / X
+
+## Overall Verdict: PASS / FAIL
+<Summary of validation results>
+
+## Recommended Actions
+1. <action>
+2. <action>
+```
+
+7. **Display the report** to the user.
+
+## Output
+
+- Full traceability validation report displayed to the user
+
+## Notes
+
+- This is the most thorough validation command; use it before marking a feature complete.
+- PASS requires 100% requirement coverage with passing tests.
+- Be precise about failures; include file paths and line numbers where possible.

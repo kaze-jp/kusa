@@ -1,73 +1,68 @@
----
-description: Manage .kiro/steering/ as persistent project knowledge
-allowed-tools: Bash, Read, Write, Edit, MultiEdit, Glob, Grep, LS
----
+# Manage Steering Documents
 
-# Kiro Steering Management
+View and edit the project's steering documents that guide spec generation and implementation.
 
-<background_information>
-**Role**: Maintain `.kiro/steering/` as persistent project memory.
+## Usage
 
-**Mission**:
-- Bootstrap: Generate core steering from codebase (first-time)
-- Sync: Keep steering and codebase aligned (maintenance)
-- Preserve: User customizations are sacred, updates are additive
+```
+/kiro:steering [show|edit <document>]
+```
 
-**Success Criteria**:
-- Steering captures patterns and principles, not exhaustive lists
-- Code drift detected and reported
-- All `.kiro/steering/*.md` treated equally (core + custom)
-</background_information>
+## Instructions
 
-<instructions>
-## Scenario Detection
+### Show Mode (default)
 
-Check `.kiro/steering/` status:
+1. **Read all steering documents** from `.ao/steering/`:
+   - `product.md` - Product vision, goals, target users
+   - `tech.md` - Technology stack, patterns, conventions
+   - `structure.md` - Project structure and file organization
 
-**Bootstrap Mode**: Empty OR missing core files (product.md, tech.md, structure.md)
-**Sync Mode**: All core files exist
+2. **Display a summary** of each document:
 
----
+```markdown
+# Steering Documents
 
-## Bootstrap Flow
+## Product (.ao/steering/product.md)
+<First 5-10 lines or key points summary>
+Status: Found | Missing
 
-1. Load templates from `.kiro/settings/templates/steering/`
-2. Analyze codebase (JIT):
-   - `Glob` for source files
-   - `Read` for CLAUDE.md, package.json, Cargo.toml, etc.
-   - `Grep` for patterns
-3. Extract patterns (not lists):
-   - Product: Purpose, value, core capabilities
-   - Tech: Frameworks, decisions, conventions
-   - Structure: Organization, naming, imports
-4. Generate steering files (follow templates)
-5. Load principles from `.kiro/settings/rules/steering-principles.md`
-6. Present summary for review
+## Tech (.ao/steering/tech.md)
+<First 5-10 lines or key points summary>
+Status: Found | Missing
 
----
+## Structure (.ao/steering/structure.md)
+<First 5-10 lines or key points summary>
+Status: Found | Missing
 
-## Sync Flow
+## Custom Documents
+<List any additional .md files in .ao/steering/>
+```
 
-1. Load all existing steering (`.kiro/steering/*.md`)
-2. Analyze codebase for changes (JIT)
-3. Detect drift
-4. Propose updates (additive, preserve user content)
-5. Report
+3. If any core document is missing, offer to create it with sensible defaults derived from the codebase.
 
----
+### Edit Mode
 
-## Granularity Principle
+1. When the user specifies `edit <document>`, read the full content of that steering document.
 
-> "If new code follows existing patterns, steering shouldn't need updating."
+2. **Present the current content** and ask the user what they want to change.
 
-Document patterns and principles, not exhaustive lists.
-</instructions>
+3. **Apply the edits** as requested by the user.
 
-## Output description
+4. **Validate the edited document**:
+   - Ensure it still has required sections
+   - Check for internal consistency
+   - Warn if changes conflict with other steering documents
 
-Chat summary only (files updated directly).
+5. **Save the updated document** and confirm the changes.
 
-## Safety & Fallback
-- **Security**: Never include keys, passwords, secrets
-- **Uncertainty**: Report both states, ask user
-- **Preservation**: Add rather than replace when in doubt
+## Output
+
+- Display of steering document status and content
+- Modified steering documents when editing
+
+## Notes
+
+- Steering documents are the source of truth for all spec commands.
+- Changes to steering documents do not retroactively update existing specs.
+- If `.ao/steering/` does not exist, create it when the user wants to add a document.
+- Custom steering documents (added via `/kiro:steering-custom`) are also listed here.

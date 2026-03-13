@@ -1,26 +1,43 @@
-# Requirements Document
+# {{FEATURE_NAME}} — Requirements
 
-## Introduction
-{{INTRODUCTION}}
+> Expanded from requirements-init using EARS format
 
-## Requirements
+## EARS Requirements
 
-### Requirement 1: {{REQUIREMENT_AREA_1}}
-<!-- Requirement headings MUST include a leading numeric ID only (for example: "Requirement 1: ...", "1. Overview", "2 Feature: ..."). Alphabetic IDs like "Requirement A" are not allowed. -->
-**Objective:** As a {{ROLE}}, I want {{CAPABILITY}}, so that {{BENEFIT}}
+### Ubiquitous Requirements
 
-#### Acceptance Criteria
-1. When [event], the [system] shall [response/action]
-2. If [trigger], then the [system] shall [response/action]
-3. While [precondition], the [system] shall [response/action]
-4. Where [feature is included], the [system] shall [response/action]
-5. The [system] shall [response/action]
+- **REQ-U1:** The system shall {{action}}.
 
-### Requirement 2: {{REQUIREMENT_AREA_2}}
-**Objective:** As a {{ROLE}}, I want {{CAPABILITY}}, so that {{BENEFIT}}
+### Event-Driven Requirements
 
-#### Acceptance Criteria
-1. When [event], the [system] shall [response/action]
-2. When [event] and [condition], the [system] shall [response/action]
+- **REQ-E1:** When {{event}}, the system shall {{action}}.
 
-<!-- Additional requirements follow the same pattern -->
+### State-Driven Requirements
+
+- **REQ-S1:** While {{state}}, the system shall {{action}}.
+
+### Optional Requirements
+
+- **REQ-O1:** Where {{condition}}, the system shall {{action}}.
+
+### Unwanted Behavior Requirements
+
+- **REQ-W1:** If {{unwanted behavior}}, the system shall {{action}}.
+
+## Acceptance Criteria
+
+- [ ] AC-1: {{criteria}}
+- [ ] AC-2: {{criteria}}
+
+## Constraints
+
+- {{constraint}}
+
+## Dependencies
+
+- {{dependency}}
+
+---
+
+**Status:** ⏳ Awaiting R1 approval
+**Next:** After approval, run `/kiro:spec-design` to create technical design.
