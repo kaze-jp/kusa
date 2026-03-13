@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.4] - 2026-03-13
+
+### Added
+
+- **右クリックコンテキストメニュー**: プレビューエリアで右クリックするとカスタムメニューを表示。「Copy Markdown」で生のMarkdownソースをコピー、「Copy as Rich Text」でリッチテキストコピー。Preview / Split 両モード対応。
+
 ## [0.3.3] - 2026-03-13
 
 ### Added
@@ -65,6 +71,7 @@ All notable changes to this project will be documented in this file.
 - IME 入力の vim normal モードでのブロック
 - Homebrew tap 経由のインストール
 
+[0.3.4]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.4
 [0.3.3]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.3
 [0.3.2]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.2
 [0.3.0]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.0
