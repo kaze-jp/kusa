@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.7] - 2026-03-13
+
+### Changed
+
+- **コードブロック折り返し**: プレビューのコードブロックが横スクロールではなく折り返し表示されるように変更。Vim-first の思想に沿い、横スクロール操作を排除。
+
 ## [0.3.6] - 2026-03-13
 
 ### Fixed
@@ -83,6 +89,7 @@ All notable changes to this project will be documented in this file.
 - IME 入力の vim normal モードでのブロック
 - Homebrew tap 経由のインストール
 
+[0.3.7]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.7
 [0.3.6]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.6
 [0.3.5]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.5
 [0.3.4]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.4
