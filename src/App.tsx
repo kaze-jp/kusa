@@ -933,6 +933,26 @@ const App: Component = () => {
       return;
     }
 
+    // Cmd+Shift+C / Ctrl+Shift+C: Copy preview as rich text (for Slack/Notion)
+    if (isMeta && e.shiftKey && (e.key === "c" || e.key === "C")) {
+      e.preventDefault();
+      const ref = previewRef();
+      if (ref) {
+        const html = ref.innerHTML;
+        const plain = ref.innerText;
+        navigator.clipboard.write([
+          new ClipboardItem({
+            "text/html": new Blob([html], { type: "text/html" }),
+            "text/plain": new Blob([plain], { type: "text/plain" }),
+          }),
+        ]).then(
+          () => setSaveNotification({ text: "Copied as rich text", type: "success" }),
+          () => setSaveNotification({ text: "Copy failed", type: "error" }),
+        );
+      }
+      return;
+    }
+
     // Cmd+Shift+V / Ctrl+Shift+V: Open clipboard content as a tab
     if (isMeta && e.shiftKey && (e.key === "v" || e.key === "V")) {
       e.preventDefault();
