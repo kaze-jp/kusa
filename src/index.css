@@ -440,7 +440,9 @@ body {
 }
 
 .context-menu-item {
-  display: block;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   width: 100%;
   padding: 6px 12px;
   border: none;
@@ -452,8 +454,19 @@ body {
   transition: background-color 0.1s ease;
 }
 
-.context-menu-item:hover {
+.context-menu-item:hover:not(:disabled) {
   background: var(--color-border);
+}
+
+.context-menu-item--disabled {
+  color: var(--color-text-tertiary);
+  cursor: default;
+}
+
+.context-menu-shortcut {
+  margin-left: 24px;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
 }
 
 .context-menu-separator {

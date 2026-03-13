@@ -1,9 +1,11 @@
-import { Component, createSignal, onCleanup, Show } from "solid-js";
+import { Component, createSignal, onCleanup, Show, For } from "solid-js";
 
 export interface ContextMenuItem {
   label: string;
   onClick: () => void;
   separator?: boolean;
+  disabled?: boolean;
+  shortcut?: string;
 }
 
 interface ContextMenuProps {
@@ -13,37 +15,59 @@ interface ContextMenuProps {
 
 /**
  * Right-click context menu for preview area.
- * Attaches to a container element and shows custom menu items.
+ * Includes custom items + standard text operations (Copy, Select All).
  */
 const ContextMenu: Component<ContextMenuProps> = (props) => {
   const [visible, setVisible] = createSignal(false);
   const [position, setPosition] = createSignal({ x: 0, y: 0 });
-  let menuRef: HTMLDivElement | undefined;
+  const [hasSelection, setHasSelection] = createSignal(false);
 
   const handleContextMenu = (e: MouseEvent) => {
     e.preventDefault();
-    // Position menu at cursor, clamping to viewport
-    const x = Math.min(e.clientX, window.innerWidth - 200);
-    const y = Math.min(e.clientY, window.innerHeight - 150);
+    const sel = window.getSelection();
+    setHasSelection(!!sel && sel.toString().length > 0);
+    const x = Math.min(e.clientX, window.innerWidth - 220);
+    const y = Math.min(e.clientY, window.innerHeight - 200);
     setPosition({ x, y });
     setVisible(true);
   };
 
-  const handleClick = () => {
-    setVisible(false);
-  };
+  const hide = () => setVisible(false);
 
   const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Escape") setVisible(false);
+    if (e.key === "Escape") hide();
   };
 
-  // Attach/detach listeners
+  // Standard text operations
+  const copySelection = () => {
+    const sel = window.getSelection();
+    if (sel && sel.toString()) {
+      navigator.clipboard.writeText(sel.toString());
+    }
+  };
+
+  const selectAll = () => {
+    const container = props.containerRef();
+    if (!container) return;
+    const range = document.createRange();
+    range.selectNodeContents(container);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  };
+
+  const allItems = (): ContextMenuItem[] => [
+    ...props.items,
+    { label: "Copy", onClick: copySelection, shortcut: "⌘C", disabled: !hasSelection(), separator: true },
+    { label: "Select All", onClick: selectAll, shortcut: "⌘A" },
+  ];
+
   const attach = () => {
     const container = props.containerRef();
     if (container) {
       container.addEventListener("contextmenu", handleContextMenu);
     }
-    document.addEventListener("click", handleClick);
+    document.addEventListener("click", hide);
     document.addEventListener("keydown", handleKeyDown);
   };
 
@@ -52,40 +76,43 @@ const ContextMenu: Component<ContextMenuProps> = (props) => {
     if (container) {
       container.removeEventListener("contextmenu", handleContextMenu);
     }
-    document.removeEventListener("click", handleClick);
+    document.removeEventListener("click", hide);
     document.removeEventListener("keydown", handleKeyDown);
   };
 
-  // Use MutationObserver-like pattern: re-attach when containerRef changes
-  // For SolidJS, we use createEffect in the parent to call attach()
-  // But simpler: attach on mount via setTimeout to ensure ref is set
   setTimeout(attach, 0);
   onCleanup(detach);
 
   return (
     <Show when={visible()}>
       <div
-        ref={menuRef}
         class="context-menu"
         style={{
           left: `${position().x}px`,
           top: `${position().y}px`,
         }}
       >
-        {props.items.map((item) => (
-          <>
-            {item.separator && <div class="context-menu-separator" />}
-            <button
-              class="context-menu-item"
-              onClick={() => {
-                item.onClick();
-                setVisible(false);
-              }}
-            >
-              {item.label}
-            </button>
-          </>
-        ))}
+        <For each={allItems()}>
+          {(item) => (
+            <>
+              {item.separator && <div class="context-menu-separator" />}
+              <button
+                class="context-menu-item"
+                classList={{ "context-menu-item--disabled": item.disabled }}
+                disabled={item.disabled}
+                onClick={() => {
+                  if (!item.disabled) {
+                    item.onClick();
+                    hide();
+                  }
+                }}
+              >
+                <span>{item.label}</span>
+                {item.shortcut && <span class="context-menu-shortcut">{item.shortcut}</span>}
+              </button>
+            </>
+          )}
+        </For>
       </div>
     </Show>
   );
