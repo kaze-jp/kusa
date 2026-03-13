@@ -2191,11 +2191,12 @@ dependencies = [
 
 [[package]]
 name = "kusa"
-version = "0.3.5"
+version = "0.3.6"
 dependencies = [
  "base64 0.22.1",
  "dirs",
  "is-terminal",
+ "libc",
  "notify",
  "reqwest 0.12.28",
  "serde",
