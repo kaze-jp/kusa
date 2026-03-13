@@ -18,8 +18,8 @@ autonomy:
 
 # --- Git 戦略 ---
 git:
-  strategy: worktree            # worktree（超推奨） | branch
-  base_branch: main             # ベースブランチ（main, develop, 任意のブランチ）
+  strategy: worktree    # worktree（超推奨） | branch
+  base_branch: main  # ベースブランチ（main, develop, 任意のブランチ）
   lock_base_branch: true        # ベースブランチを直接変更しない（推奨）
   branch_prefix: konbini/
 
@@ -155,6 +155,11 @@ review_comments:
   format: "[ao-{role}]"
   auto_resolve: true
   sync_to_memory: true
+
+# --- CLAUDE.md ---
+claude_md:
+  language: ja
+  path: CLAUDE.md
 
 # --- 学習ループ ---
 memory:
