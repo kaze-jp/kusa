@@ -1,109 +1,43 @@
 # Task Generation Rules
 
-## Core Principles
+These rules govern how implementation tasks are generated from design documents.
 
-### 1. Natural Language Descriptions
-Focus on capabilities and outcomes, not code structure.
+## Task Structure
 
-**Describe**:
-- What functionality to achieve
-- Business logic and behavior
-- Features and capabilities
-- Domain language and concepts
-- Data relationships and workflows
+- Each task MUST have a unique ID (T-001, T-002, etc.).
+- Each task MUST have clear, verifiable acceptance criteria.
+- Each task MUST specify the exact files to create or modify.
+- Each task MUST include test requirements (what to test, expected coverage).
+- Each task MUST have an effort estimate: Small (< 1hr), Medium (1-2hr), Large (2-4hr).
 
-**Avoid**:
-- File paths and directory structure
-- Function/method names and signatures
-- Type definitions and interfaces
-- Class names and API contracts
-- Specific data structures
+## Task Scope
 
-**Rationale**: Implementation details are defined in design.md. Tasks describe the functional work.
+- A single task SHOULD represent 1-4 hours of work. If larger, break it down.
+- A single task SHOULD NOT modify more than 5 files. If more, split it.
+- Each task MUST be independently verifiable; completion should not depend on subjective judgment.
+- Tasks must not contain conditional logic ("if X then do Y, otherwise Z"); create separate tasks instead.
 
-### 2. Task Integration & Progression
+## Dependencies
 
-**Every task must**:
-- Build on previous outputs (no orphaned code)
-- Connect to the overall system (no hanging features)
-- Progress incrementally (no big jumps in complexity)
-- Validate core functionality early in sequence
-- Respect architecture boundaries defined in design.md
-- Honor interface contracts documented in design.md
+- Dependencies between tasks MUST be explicit using task IDs.
+- Infrastructure and shared utility tasks must come before feature tasks that depend on them.
+- No implicit ordering; if order matters, it must be a declared dependency.
+- Circular dependencies between tasks are not allowed.
 
-**End with integration tasks** to wire everything together.
+## Parallelization
 
-### 3. Flexible Task Sizing
+- Mark tasks that can execute in parallel with **(P)** after the title.
+- A task can be marked (P) only if it shares NO file modifications with other (P) tasks in the same group.
+- Parallel tasks must be independently testable without depending on each other's output.
 
-**Guidelines**:
-- **Major tasks**: As many sub-tasks as logically needed
-- **Sub-tasks**: 1-3 hours each, 3-10 details per sub-task
-- Balance between too granular and too broad
+## Traceability
 
-### 4. Requirements Mapping
+- Every task MUST trace back to at least one requirement via the design document.
+- The tasks document must include a requirements traceability table.
+- Every requirement must be covered by at least one task.
 
-**End each task detail section with**:
-- `_Requirements: X.X, Y.Y_` listing **only numeric requirement IDs** (comma-separated)
-- Reference components/interfaces from design.md when helpful
+## Special Tasks
 
-### 5. Code-Only Focus
-
-**Include ONLY**:
-- Coding tasks (implementation)
-- Testing tasks (unit, integration, E2E)
-- Technical setup tasks (infrastructure, configuration)
-
-**Exclude**:
-- Deployment tasks
-- Documentation tasks
-- User testing
-
-### Optional Test Coverage Tasks
-- Mark deferrable test work with `(optional-test)` marker
-- Only apply when sub-task covers acceptance criteria already satisfied by core implementation
-
-## Task Hierarchy Rules
-
-### Maximum 2 Levels
-- **Level 1**: Major tasks (1, 2, 3, 4...)
-- **Level 2**: Sub-tasks (1.1, 1.2, 2.1, 2.2...)
-- **No deeper nesting** (no 1.1.1)
-- Collapse single-subtask structures by promoting to major level
-
-### Sequential Numbering
-- Major tasks MUST increment: 1, 2, 3, 4, 5...
-- Sub-tasks reset per major task: 1.1, 1.2, then 2.1, 2.2...
-- Never repeat major task numbers
-
-### Parallel Analysis (default)
-- Assume parallel analysis is enabled unless explicitly disabled
-- Identify tasks that can run concurrently when **all** conditions hold:
-  - No data dependency on other pending tasks
-  - No shared file or resource contention
-  - No prerequisite review/approval from another task
-- Append `(P)` immediately after the task number for each parallel-capable task
-- If sequential mode is requested, omit `(P)` markers entirely
-
-### Checkbox Format
-```markdown
-- [ ] 1. Major task description
-- [ ] 1.1 Sub-task description
-  - Detail item 1
-  - Detail item 2
-  - _Requirements: X.X_
-
-- [ ] 1.2 Sub-task description
-  - Detail items...
-  - _Requirements: Y.Y_
-
-- [ ] 2. Next major task (NOT 1 again!)
-- [ ] 2.1 Sub-task...
-```
-
-## Requirements Coverage
-
-**Mandatory Check**:
-- ALL requirements from requirements.md MUST be covered
-- Cross-reference every requirement ID with task mappings
-- If gaps found: Return to requirements or design phase
-- No requirement should be left without corresponding tasks
+- Always include a final integration or smoke-test task as the last task.
+- Database migration tasks must precede tasks that depend on the new schema.
+- Configuration or environment setup tasks must come first in the dependency chain.

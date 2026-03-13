@@ -1,49 +1,50 @@
-# EARS Format Guidelines
+# EARS Format Rules
 
-## Overview
-EARS (Easy Approach to Requirements Syntax) is the standard format for acceptance criteria in spec-driven development.
+All requirements must follow the EARS (Easy Approach to Requirements Syntax) format. This ensures requirements are unambiguous, testable, and consistently structured.
 
-EARS patterns describe the logical structure of a requirement (condition + subject + response) and are not tied to any particular natural language.
-All acceptance criteria should be written in the target language configured for the specification (for example, `spec.json.language` / `ja`).
-Keep EARS trigger keywords and fixed phrases in English (`When`, `If`, `While`, `Where`, `The system shall`, `The [system] shall`) and localize only the variable parts (`[event]`, `[precondition]`, `[trigger]`, `[feature is included]`, `[response/action]`) into the target language. Do not interleave target-language text inside the trigger or fixed English phrases themselves.
+## Patterns
 
-## Primary EARS Patterns
+### Ubiquitous (always active)
+**Template**: "The <system> shall <action>."
 
-### 1. Event-Driven Requirements
-- **Pattern**: When [event], the [system] shall [response/action]
-- **Use Case**: Responses to specific events or triggers
-- **Example**: When user opens a markdown file, kusa shall render the preview within 200ms
+Use when the requirement applies at all times without any trigger or condition.
 
-### 2. State-Driven Requirements
-- **Pattern**: While [precondition], the [system] shall [response/action]
-- **Use Case**: Behavior dependent on system state or preconditions
-- **Example**: While in edit mode, kusa shall display the CodeMirror editor with vim keybindings
+**Example**: "The system shall encrypt all data at rest using AES-256."
 
-### 3. Unwanted Behavior Requirements
-- **Pattern**: If [trigger], the [system] shall [response/action]
-- **Use Case**: System response to errors, failures, or undesired situations
-- **Example**: If file read fails, kusa shall display an error message with the file path
+### Event-Driven (triggered by an event)
+**Template**: "When <event>, the <system> shall <action>."
 
-### 4. Optional Feature Requirements
-- **Pattern**: Where [feature is included], the [system] shall [response/action]
-- **Use Case**: Requirements for optional or conditional features
-- **Example**: Where split view is active, kusa shall synchronize scroll position between editor and preview
+Use when the requirement is triggered by a specific, detectable event.
 
-### 5. Ubiquitous Requirements
-- **Pattern**: The [system] shall [response/action]
-- **Use Case**: Always-active requirements and fundamental system properties
-- **Example**: kusa shall use dark theme as the default color scheme
+**Example**: "When a user submits the login form, the system shall validate the credentials within 2 seconds."
 
-## Combined Patterns
-- While [precondition], when [event], the [system] shall [response/action]
-- When [event] and [additional condition], the [system] shall [response/action]
+### State-Driven (active during a state)
+**Template**: "While <state>, the <system> shall <action>."
 
-## Subject Selection Guidelines
-- **Desktop Application**: Use app name (e.g., "kusa", "the editor", "the preview pane")
-- **Backend (Rust)**: Use component name (e.g., "the file handler", "the CLI parser")
-- **Frontend (SolidJS)**: Use component name (e.g., "the editor component", "the toolbar")
+Use when the requirement applies only while the system is in a specific state.
 
-## Quality Criteria
-- Requirements must be testable, verifiable, and describe a single behavior.
-- Use objective language: "shall" for mandatory behavior, "should" for recommendations; avoid ambiguous terms.
-- Follow EARS syntax: [condition], the [system] shall [response/action].
+**Example**: "While the system is in maintenance mode, the system shall display a maintenance page to all users."
+
+### Optional (conditional on a feature or configuration)
+**Template**: "Where <condition>, the <system> shall <action>."
+
+Use when the requirement applies only under a specific condition or configuration.
+
+**Example**: "Where the user has enabled two-factor authentication, the system shall require a verification code after password entry."
+
+### Unwanted (handling negative scenarios)
+**Template**: "If <unwanted situation>, the <system> shall <action>."
+
+Use when specifying how the system handles error states, failures, or unwanted conditions.
+
+**Example**: "If the database connection is lost, the system shall retry the connection three times with exponential backoff."
+
+## Rules
+
+- Every requirement MUST use exactly one of the five EARS patterns.
+- Do NOT use ambiguous words: "should", "may", "might", "could", "would".
+- Do NOT combine multiple behaviors in a single requirement; split them.
+- Each requirement MUST be independently testable.
+- Requirements MUST NOT describe implementation details (no "use React", "call the API").
+- Requirements MUST specify measurable criteria where applicable (timeouts, limits, thresholds).
+- Number all requirements with a prefix and sequential ID (e.g., FR-001, NFR-001).

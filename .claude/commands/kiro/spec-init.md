@@ -1,65 +1,71 @@
----
-description: Initialize a new specification with detailed project description
-allowed-tools: Bash, Read, Write, Glob
-argument-hint: <project-description>
----
+# Initialize Feature Spec
 
-# Spec Initialization
+Initialize a new feature specification directory and generate initial requirements.
 
-<background_information>
-- **Mission**: Initialize the first phase of spec-driven development by creating directory structure and metadata for a new specification
-- **Success Criteria**:
-  - Generate appropriate feature name from project description
-  - Create unique spec structure without conflicts
-  - Provide clear path to next phase (requirements generation)
-</background_information>
+## Usage
 
-<instructions>
-## Core Task
-Generate a unique feature name from the project description ($ARGUMENTS) and initialize the specification structure.
+```
+/kiro:spec-init <feature-name>
+```
 
-## Execution Steps
-1. **Check Uniqueness**: Verify `.kiro/specs/` for naming conflicts (append number suffix if needed)
-2. **Create Directory**: `.kiro/specs/[feature-name]/`
-3. **Initialize Files Using Templates**:
-   - Read `.kiro/settings/templates/specs/init.json`
-   - Read `.kiro/settings/templates/specs/requirements-init.md`
-   - Replace placeholders:
-     - `{{FEATURE_NAME}}` → generated feature name
-     - `{{TIMESTAMP}}` → current ISO 8601 timestamp
-     - `{{PROJECT_DESCRIPTION}}` → $ARGUMENTS
-   - Write `spec.json` and `requirements.md` to spec directory
+## Instructions
 
-## Important Constraints
-- DO NOT generate requirements/design/tasks at this stage
-- Follow stage-by-stage development principles
-- Maintain strict phase separation
-- Only initialization is performed in this phase
-</instructions>
+1. **Read product context** from `.ao/steering/product.md` if it exists. Use this to understand the product vision, target users, and strategic goals.
 
-## Tool Guidance
-- Use **Glob** to check existing spec directories for name uniqueness
-- Use **Read** to fetch templates: `init.json` and `requirements-init.md`
-- Use **Write** to create spec.json and requirements.md after placeholder replacement
-- Perform validation before any file write operation
+2. **Create the spec directory** at `.kiro/specs/$FEATURE_NAME/`.
 
-## Output Description
-Provide output in the language specified in `spec.json` with the following structure:
+3. **Gather feature information** by asking the user:
+   - What is the feature's purpose?
+   - Who are the target users?
+   - What problem does it solve?
+   - Are there any known constraints?
 
-1. **Generated Feature Name**: `feature-name` format with 1-2 sentence rationale
-2. **Project Summary**: Brief summary (1 sentence)
-3. **Created Files**: Bullet list with full paths
-4. **Next Step**: Command block showing `/kiro:spec-requirements <feature-name>`
-5. **Notes**: Explain why only initialization was performed (2-3 sentences on phase separation)
+4. **Generate `requirements-init.md`** in the spec directory with the following structure:
 
-**Format Requirements**:
-- Use Markdown headings (##, ###)
-- Wrap commands in code blocks
-- Keep total output concise (under 250 words)
-- Use clear, professional language per `spec.json.language`
+```markdown
+# Feature: <feature-name>
 
-## Safety & Fallback
-- **Ambiguous Feature Name**: If feature name generation is unclear, propose 2-3 options and ask user to select
-- **Template Missing**: If template files don't exist in `.kiro/settings/templates/specs/`, report error with specific missing file path and suggest checking repository setup
-- **Directory Conflict**: If feature name already exists, append numeric suffix (e.g., `feature-name-2`) and notify user of automatic conflict resolution
-- **Write Failure**: Report error with specific path and suggest checking permissions or disk space
+## Overview
+<Brief description of the feature and its purpose>
+
+## Product Context
+<Relevant context from product.md>
+
+## Initial Requirements
+
+### Functional Requirements
+<List requirements using EARS format>
+
+### Non-Functional Requirements
+<Performance, security, accessibility requirements using EARS format>
+
+### Constraints
+<Known constraints and limitations>
+
+### Assumptions
+<Assumptions made during requirements gathering>
+
+### Open Questions
+<Questions that need answers before proceeding>
+```
+
+5. **Apply EARS format** for all requirements:
+   - Ubiquitous: "The <system> shall <action>"
+   - Event-driven: "When <event>, the <system> shall <action>"
+   - State-driven: "While <state>, the <system> shall <action>"
+   - Optional: "Where <condition>, the <system> shall <action>"
+   - Unwanted: "If <unwanted>, the <system> shall <action>"
+
+6. **Confirm with the user** that the initial requirements capture their intent before finalizing.
+
+7. **Report** the created file path and suggest running `/kiro:spec-requirements` next to expand into full requirements.
+
+## Output
+
+- `.kiro/specs/<feature-name>/requirements-init.md`
+
+## Notes
+
+- Feature names should use kebab-case (e.g., `user-auth`, `payment-flow`).
+- If `.ao/steering/product.md` does not exist, proceed without product context but note the gap.
+- Each requirement should be individually numbered (e.g., FR-001, NFR-001).

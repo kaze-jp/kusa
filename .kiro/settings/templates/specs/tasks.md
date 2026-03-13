@@ -1,21 +1,60 @@
-# Implementation Plan
+# {{FEATURE_NAME}} — Implementation Tasks
 
-## Task Format Template
+> Generated from approved design
 
-Use whichever pattern fits the work breakdown:
+## Parallel Analysis
 
-### Major task only
-- [ ] {{NUMBER}}. {{TASK_DESCRIPTION}}{{PARALLEL_MARK}}
-  - {{DETAIL_ITEM_1}} *(Include details only when needed. If the task stands alone, omit bullet items.)*
-  - _Requirements: {{REQUIREMENT_IDS}}_
+- **Total tasks:** {{N}}
+- **Parallelizable:** {{M}} tasks marked with (P)
+- **Sequential:** {{K}} tasks with dependencies
+- **Estimated integration points:** {{list}}
 
-### Major + Sub-task structure
-- [ ] {{MAJOR_NUMBER}}. {{MAJOR_TASK_SUMMARY}}
-- [ ] {{MAJOR_NUMBER}}.{{SUB_NUMBER}} {{SUB_TASK_DESCRIPTION}}{{SUB_PARALLEL_MARK}}
-  - {{DETAIL_ITEM_1}}
-  - {{DETAIL_ITEM_2}}
-  - _Requirements: {{REQUIREMENT_IDS}}_ *(IDs only; do not add descriptions or parentheses.)*
+## Tasks
 
-> **Parallel marker**: Append ` (P)` only to tasks that can be executed in parallel. Omit the marker when running in `--sequential` mode.
->
-> **Optional test coverage**: When a sub-task is deferrable test work tied to acceptance criteria, keep the standard `- [ ]` checkbox and append `(optional-test)` in the task description.
+### Task 1: {{title}} (P)
+
+- **Description:** {{description}}
+- **Files:**
+  - Create: {{file}}
+  - Modify: {{file}}
+- **Test requirements:**
+  - [ ] {{test description}}
+- **Acceptance criteria:**
+  - [ ] {{criteria}}
+- **Dependencies:** None
+- **Branch:** `konbini/{{feature}}-task-1`
+
+### Task 2: {{title}} (P)
+
+- **Description:** {{description}}
+- **Files:**
+  - Create: {{file}}
+- **Test requirements:**
+  - [ ] {{test description}}
+- **Acceptance criteria:**
+  - [ ] {{criteria}}
+- **Dependencies:** None
+- **Branch:** `konbini/{{feature}}-task-2`
+
+### Task 3: {{title}}
+
+- **Description:** {{description}}
+- **Files:**
+  - Modify: {{file}}
+- **Test requirements:**
+  - [ ] {{test description}}
+- **Acceptance criteria:**
+  - [ ] {{criteria}}
+- **Dependencies:** Task 1, Task 2
+- **Branch:** `konbini/{{feature}}-task-3`
+
+## File Conflict Analysis
+
+| File | Task 1 | Task 2 | Task 3 | Conflict Risk |
+|------|--------|--------|--------|---------------|
+| {{file}} | ✓ | | ✓ | Low |
+
+---
+
+**Status:** ⏳ Awaiting R3 approval
+**Next:** After approval, run `/kiro:spec-impl` or `/kiro:ao-run` to begin implementation.

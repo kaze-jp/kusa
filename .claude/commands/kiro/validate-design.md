@@ -1,59 +1,79 @@
----
-description: Interactive technical design quality review and validation
-allowed-tools: Read, Glob, Grep
-argument-hint: <feature-name>
----
+# Validate Design
 
-# Technical Design Validation
+Validate a design document against its requirements for completeness, consistency, and correctness.
 
-<background_information>
-- **Mission**: Conduct interactive quality review of technical design to ensure readiness for implementation
-- **Success Criteria**:
-  - Critical issues identified (maximum 3 most important concerns)
-  - Balanced assessment with strengths recognized
-  - Clear GO/NO-GO decision with rationale
-  - Actionable feedback for improvements if needed
-</background_information>
+## Usage
 
-<instructions>
-## Core Task
-Interactive design quality review for feature **$1** based on approved requirements and design document.
+```
+/kiro:validate-design <feature-name>
+```
 
-## Execution Steps
+## Instructions
 
-1. **Load Context**:
-   - Read `.kiro/specs/$1/spec.json` for language and metadata
-   - Read `.kiro/specs/$1/requirements.md` for requirements
-   - Read `.kiro/specs/$1/design.md` for design document
-   - **Load ALL steering context**: Read entire `.kiro/steering/` directory
+1. **Read both documents**:
+   - `.kiro/specs/$FEATURE_NAME/requirements.md`
+   - `.kiro/specs/$FEATURE_NAME/design.md`
 
-2. **Read Review Guidelines**:
-   - Read `.kiro/settings/rules/design-review.md` for review criteria and process
+   If either is missing, report which file is absent and what command to run.
 
-3. **Execute Design Review**:
-   - Follow design-review.md process: Analysis → Critical Issues → Strengths → GO/NO-GO
-   - Limit to 3 most important concerns
-   - Use language specified in spec.json for output
+2. **Perform traceability check**:
+   - For EVERY requirement ID in `requirements.md`, verify it appears in the design's traceability section
+   - Flag any requirement that has no corresponding design component
+   - Flag any design component that does not trace back to a requirement
 
-4. **Provide Decision and Next Steps**
+3. **Check for gaps**:
+   - Error handling: Does every API contract specify error cases?
+   - Edge cases: Are boundary conditions from requirements addressed?
+   - Security: Are authentication/authorization requirements covered?
+   - Performance: Are performance requirements reflected in design choices?
+   - Accessibility: Are accessibility requirements addressed?
 
-## Important Constraints
-- **Quality assurance, not perfection seeking**: Accept acceptable risk
-- **Critical focus only**: Maximum 3 issues
-- **Interactive approach**: Engage in dialogue
-- **Balanced assessment**: Recognize both strengths and weaknesses
-</instructions>
+4. **Check for inconsistencies**:
+   - Data model fields must match what API contracts reference
+   - Component interfaces must be compatible with their consumers
+   - State management must account for all state transitions in requirements
+   - Naming must be consistent across all design sections
 
-## Tool Guidance
-- **Read first**: Load all context before review
-- **Grep if needed**: Search codebase for pattern validation
+5. **Check design quality**:
+   - Architecture decisions have rationale documented
+   - Component boundaries are clear and explicit
+   - No circular dependencies between components
+   - Testing strategy covers all components
+   - No premature optimization
 
-## Output Description
-1. **Review Summary**: Brief overview (2-3 sentences)
-2. **Critical Issues**: Maximum 3, following design-review.md format
-3. **Design Strengths**: 1-2 positive aspects
-4. **Final Assessment**: GO/NO-GO decision with rationale and next steps
+6. **Generate validation report**:
 
-## Safety & Fallback
-- **Missing Design**: Stop with message to run `/kiro:spec-design $1` first
-- **Design Not Generated**: Warn but proceed with review
+```markdown
+# Design Validation: <feature-name>
+
+## Traceability
+- Requirements covered: X / Y
+- Uncovered requirements: [list]
+- Orphan design components: [list]
+
+## Gaps Found
+- [ ] <gap description with severity: Critical/Major/Minor>
+
+## Inconsistencies Found
+- [ ] <inconsistency description>
+
+## Design Quality
+- [ ] All decisions have rationale: Pass/Fail
+- [ ] Component boundaries clear: Pass/Fail
+- [ ] No circular dependencies: Pass/Fail
+- [ ] Error handling complete: Pass/Fail
+
+## Verdict: PASS / NEEDS REVISION
+<Summary and recommended fixes>
+```
+
+7. **Display the report** to the user.
+
+## Output
+
+- Validation report displayed to the user
+
+## Notes
+
+- A single uncovered requirement is grounds for NEEDS REVISION.
+- Be specific about what is missing; vague feedback is not actionable.
