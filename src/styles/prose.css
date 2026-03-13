@@ -121,6 +121,8 @@
   padding: 1rem;
   border-radius: 0.5rem;
   overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
   font-size: 0.875rem;
   line-height: 1.6;
 }
