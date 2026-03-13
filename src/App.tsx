@@ -936,20 +936,7 @@ const App: Component = () => {
     // Cmd+Shift+C / Ctrl+Shift+C: Copy preview as rich text (for Slack/Notion)
     if (isMeta && e.shiftKey && (e.key === "c" || e.key === "C")) {
       e.preventDefault();
-      const ref = previewRef();
-      if (ref) {
-        const html = ref.innerHTML;
-        const plain = ref.innerText;
-        navigator.clipboard.write([
-          new ClipboardItem({
-            "text/html": new Blob([html], { type: "text/html" }),
-            "text/plain": new Blob([plain], { type: "text/plain" }),
-          }),
-        ]).then(
-          () => setSaveNotification({ text: "Copied as rich text", type: "success" }),
-          () => setSaveNotification({ text: "Copy failed", type: "error" }),
-        );
-      }
+      copyPreviewAsRichText();
       return;
     }
 
@@ -995,6 +982,23 @@ const App: Component = () => {
   // Handle heading click from TOC
   function handleHeadingClick(id: string) {
     actions.jumpToHeading(id);
+  }
+
+  // Copy preview as rich text (reused by shortcut and button)
+  function copyPreviewAsRichText() {
+    const ref = previewRef();
+    if (!ref) return;
+    const html = ref.innerHTML;
+    const plain = ref.innerText;
+    navigator.clipboard.write([
+      new ClipboardItem({
+        "text/html": new Blob([html], { type: "text/html" }),
+        "text/plain": new Blob([plain], { type: "text/plain" }),
+      }),
+    ]).then(
+      () => setSaveNotification({ text: "Copied as rich text", type: "success" }),
+      () => setSaveNotification({ text: "Copy failed", type: "error" }),
+    );
   }
 
   // Handle heading select from picker
@@ -1129,6 +1133,17 @@ const App: Component = () => {
             html={html()}
             ref={setPreviewRef}
           />
+          {/* Floating copy button */}
+          <button
+            class="copy-preview-btn"
+            title="Copy as rich text (⌘⇧C)"
+            onClick={copyPreviewAsRichText}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" />
+              <path d="M10.5 5.5V3.5a1.5 1.5 0 0 0-1.5-1.5H3.5A1.5 1.5 0 0 0 2 3.5V9a1.5 1.5 0 0 0 1.5 1.5h2" />
+            </svg>
+          </button>
         </div>
       </div>
       <HeadingPicker

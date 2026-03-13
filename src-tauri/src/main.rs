@@ -2,6 +2,15 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
+    // Handle --version / -V before anything else (works in both debug and release)
+    {
+        let args: Vec<String> = std::env::args().collect();
+        if args.iter().any(|a| a == "--version" || a == "-V") {
+            println!("kusa {}", env!("CARGO_PKG_VERSION"));
+            return;
+        }
+    }
+
     // In release builds on macOS, if launched from a terminal (not via `open`),
     // relaunch via `open` so the CLI returns immediately.
     // Piped stdin (e.g. `cat file | kusa`) is NOT a terminal, so it goes through normally.
