@@ -10,6 +10,8 @@ Initialize a new feature specification directory and generate initial requiremen
 
 ## Instructions
 
+0. **Worktree guard** — Before anything else, check if you are working in a git worktree (not on the main/master branch). If you are on the main branch, **stop and create a worktree first** using the `superpowers:using-git-worktrees` skill or `git worktree add`. Do NOT proceed with spec initialization until you are in an isolated worktree.
+
 1. **Read product context** from `.ao/steering/product.md` if it exists. Use this to understand the product vision, target users, and strategic goals.
 
 2. **Create the spec directory** at `.kiro/specs/$FEATURE_NAME/`.
