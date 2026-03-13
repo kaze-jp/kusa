@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.5] - 2026-03-13
+
+### Fixed
+
+- **コンテキストメニュー改善**: カスタムメニューがデフォルトの右クリックメニューを完全に置き換えてしまい、テキスト選択のコピーができなくなっていた問題を修正。Copy（⌘C）と Select All（⌘A）をメニュー項目に追加し、選択範囲がない場合は Copy を無効化表示。
+
 ## [0.3.4] - 2026-03-13
 
 ### Added
@@ -71,6 +77,7 @@ All notable changes to this project will be documented in this file.
 - IME 入力の vim normal モードでのブロック
 - Homebrew tap 経由のインストール
 
+[0.3.5]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.5
 [0.3.4]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.4
 [0.3.3]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.3
 [0.3.2]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.2
