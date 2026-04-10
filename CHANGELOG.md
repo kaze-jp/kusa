@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.9] - 2026-04-10
+
+### Fixed
+
+- **相対パスが解決できない問題**: `open -a` によるrelaunch時にcwdが変わるため、相対パスのファイルが開けなかった。relaunch前に全ての相対パスをcwd基準で絶対パスに変換するように修正。ファイルが存在しない場合でもcwdと結合して絶対パス化する。
+
 ## [0.3.8] - 2026-04-10
 
 ### Fixed
@@ -95,6 +101,7 @@ All notable changes to this project will be documented in this file.
 - IME 入力の vim normal モードでのブロック
 - Homebrew tap 経由のインストール
 
+[0.3.9]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.9
 [0.3.8]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.8
 [0.3.7]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.7
 [0.3.6]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.6

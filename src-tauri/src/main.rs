@@ -48,16 +48,28 @@ fn main() {
                         .cloned()
                         .collect();
 
-                    // Resolve relative file paths to absolute before relaunching
+                    // Resolve relative file paths to absolute before relaunching.
+                    // `open -a` changes cwd, so relative paths must be resolved here.
+                    let cwd = std::env::current_dir().ok();
                     let resolved_args: Vec<String> = user_args
                         .iter()
                         .map(|arg| {
                             if !arg.starts_with('-') {
                                 let p = std::path::Path::new(arg);
-                                if p.exists() {
-                                    if let Ok(abs) = std::fs::canonicalize(p) {
-                                        return abs.to_string_lossy().to_string();
-                                    }
+                                // Already absolute — just canonicalize if possible
+                                if p.is_absolute() {
+                                    return std::fs::canonicalize(p)
+                                        .map(|a| a.to_string_lossy().to_string())
+                                        .unwrap_or_else(|_| arg.clone());
+                                }
+                                // Relative path — resolve against cwd
+                                if let Some(ref cwd) = cwd {
+                                    let abs = cwd.join(p);
+                                    // Use canonicalize if the file exists, otherwise keep the joined path
+                                    return std::fs::canonicalize(&abs)
+                                        .unwrap_or(abs)
+                                        .to_string_lossy()
+                                        .to_string();
                                 }
                             }
                             arg.clone()
