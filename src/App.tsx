@@ -645,52 +645,80 @@ const App: Component = () => {
   // -----------------------------------------------------------------------
 
   onMount(async () => {
-    // 1. Initialize window mode
-    try {
-      const mode = (await invoke<string>("get_window_mode")) as WindowMode;
-      initWindowMode(mode);
-    } catch (err) {
-      console.error("Failed to get window mode, defaulting to full:", err);
-      initWindowMode("full");
-    }
-    setModeReady(true);
+    // Safety net: if still loading after 2s, force transition to demo mode
+    // and ensure the window is visible
+    const loadingTimeout = setTimeout(() => {
+      if (viewMode() === "loading") {
+        console.warn("[kusa] Loading timeout reached, falling back to demo mode");
+        setViewMode("demo");
+      }
+      getCurrentWindow().show().catch(() => {});
+    }, 2000);
 
-    // 2. Setup Tauri event listeners (for drag-drop, single-instance, etc.)
-    await setupTauriListeners();
-
-    // 3. Pull CLI args from backend (avoids race condition with events)
     try {
-      const args = await invoke<{ file?: string; clipboard?: boolean; dir?: string } | null>("get_cli_args");
-      if (args) {
-        if (args.file) {
-          await openFileInTab(args.file);
-        } else if (args.clipboard) {
-          const result = await resolveInputSource({ clipboard: true });
-          if (result) {
-            initialInputResolved = true;
-            displayBufferContent(result);
-          }
-        } else if (args.dir) {
-          setDirPath(args.dir);
-          try {
-            const files = await invoke<MdFileEntry[]>("list_md_files", { dirPath: args.dir });
-            setFileList(files);
-            if (tabStore.tabCount() === 0) {
+      // 1. Initialize window mode
+      try {
+        const mode = (await invoke<string>("get_window_mode")) as WindowMode;
+        initWindowMode(mode);
+      } catch (err) {
+        console.error("Failed to get window mode, defaulting to full:", err);
+        initWindowMode("full");
+      }
+      setModeReady(true);
+
+      // 2. Setup Tauri event listeners (for drag-drop, single-instance, etc.)
+      try {
+        await setupTauriListeners();
+      } catch (err) {
+        console.error("Failed to setup Tauri listeners:", err);
+      }
+
+      // 3. Pull CLI args from backend (avoids race condition with events)
+      try {
+        const args = await invoke<{ file?: string; clipboard?: boolean; dir?: string } | null>("get_cli_args");
+        if (args) {
+          if (args.file) {
+            await openFileInTab(args.file);
+          } else if (args.clipboard) {
+            const result = await resolveInputSource({ clipboard: true });
+            if (result) {
+              initialInputResolved = true;
+              displayBufferContent(result);
+            }
+          } else if (args.dir) {
+            setDirPath(args.dir);
+            try {
+              const files = await invoke<MdFileEntry[]>("list_md_files", { dirPath: args.dir });
+              setFileList(files);
+              if (tabStore.tabCount() === 0) {
+                setViewMode("file-list");
+              }
+            } catch (err) {
+              console.error("Failed to list md files:", err);
+              setFileList([]);
               setViewMode("file-list");
             }
-          } catch (err) {
-            console.error("Failed to list md files:", err);
-            setFileList([]);
-            setViewMode("file-list");
           }
         }
+      } catch (err) {
+        console.error("Failed to get CLI args:", err);
+      }
+
+      // 4. If no input was resolved and still loading, show demo mode
+      if (viewMode() === "loading") {
+        setViewMode("demo");
       }
     } catch (err) {
-      console.error("Failed to get CLI args:", err);
+      // Catch-all: ensure we never stay stuck on loading
+      console.error("[kusa] Unexpected error during initialization:", err);
+      if (viewMode() === "loading") {
+        setViewMode("demo");
+      }
+    } finally {
+      // Always show the window and clear the timeout
+      clearTimeout(loadingTimeout);
+      getCurrentWindow().show().catch(() => {});
     }
-
-    // 4. Show window once the frontend is ready
-    getCurrentWindow().show();
   });
 
   // Process markdown to HTML
