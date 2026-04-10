@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.8] - 2026-04-10
+
+### Fixed
+
+- **起動時にローディングで止まる問題**: `onMount` 内の初期化処理でエラーが発生した場合にウィンドウが表示されず、`viewMode` が `"loading"` のまま永遠に止まるバグを修正。`setupTauriListeners()` のエラーハンドリング追加、CLI引数なし時のdemoモードフォールバック、2秒タイムアウトによる強制遷移、`finally` ブロックでのウィンドウ表示保証を実装。
+
 ## [0.3.7] - 2026-03-13
 
 ### Changed
@@ -89,6 +95,7 @@ All notable changes to this project will be documented in this file.
 - IME 入力の vim normal モードでのブロック
 - Homebrew tap 経由のインストール
 
+[0.3.8]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.8
 [0.3.7]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.7
 [0.3.6]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.6
 [0.3.5]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.5
