@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.10] - 2026-05-27
+
+### Fixed
+
+- **CLI relaunch の spawn 失敗が握りつぶされる問題 (#68)**: macOS リリースビルドで `open -a` による relaunch が失敗してもユーザーに通知されず、ウィンドウが出ないまま CLI プロセスだけ return する現象を修正。spawn 失敗時に stderr に通知し、in-process fallback で起動を継続するように変更。`.app/` 抽出を `rfind` に変更し canonicalize 検証も追加 (PR #76)。
+- **`create_window` 失敗で zombie プロセス化する問題 (#69)**: `setup()` 内の `create_window` Err が握りつぶされて Ok を返し、ウィンドウなしでプロセスが残る現象を修正。Fatal 時は `setup` から Err を返却し、Full mode にも safe-defaults fallback を追加。`window.show()` 失敗もログ出力するように変更 (PR #77)。
+- **single-instance plugin の race condition (#70)**: `.setup()` 完了前に呼ばれる single-instance callback で `cli-open` event が listener 不在のため捨てられる問題を修正。`PendingEventBuffer` でバッファし、frontend が `flush_pending_events` を呼んで flush する仕組みを追加 (PR #74)。
+- **Frontend `window.show()` 失敗が空 catch で消える問題 (#71)**: `getCurrentWindow().show().catch(() => {})` で show 失敗時にログも retry もない問題を、3 回 retry + 最終 `setFocus/center/show` fallback を持つ `ensureWindowVisible` helper に置き換え (PR #73)。
+- **`read_file` がサイズ上限なしで OOM panic する問題 (#72)**: 巨大ファイル (動画/ログ/誤 open バイナリ等) を読んで panic する可能性を、64MiB のサイズチェックで防止。上限超過時は明示エラーを返す (PR #75)。
+
 ## [0.3.9] - 2026-04-10
 
 ### Fixed
@@ -101,6 +111,7 @@ All notable changes to this project will be documented in this file.
 - IME 入力の vim normal モードでのブロック
 - Homebrew tap 経由のインストール
 
+[0.3.10]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.10
 [0.3.9]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.9
 [0.3.8]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.8
 [0.3.7]: https://github.com/kaze-jp/kusa/releases/tag/v0.3.7
