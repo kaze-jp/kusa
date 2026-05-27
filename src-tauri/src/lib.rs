@@ -6,7 +6,15 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{Emitter, WebviewWindowBuilder, WebviewUrl, Manager, RunEvent};
 use tauri_plugin_cli::CliExt;
-use window_presets::{PeekConfig, FULL_SIZE, PEEK_MIN_SIZE, resolve_preset};
+use window_presets::{PeekConfig, WindowSize, FULL_SIZE, PEEK_MIN_SIZE, resolve_preset};
+
+/// Size used for the Full-mode safe-defaults fallback when the primary
+/// `WebviewWindowBuilder` fails (e.g. due to a corrupted window-state file
+/// restored by `tauri_plugin_window_state`). Kept as a tiny helper so it can
+/// be unit-tested without launching a Tauri runtime.
+const fn safe_default_full_size() -> WindowSize {
+    FULL_SIZE
+}
 
 /// Stores the window mode so the frontend can query it via a Tauri command.
 #[derive(Debug, Default)]
@@ -117,15 +125,36 @@ fn create_window(app: &tauri::App, peek_config: &PeekConfig) -> Result<(), Box<d
             }
         }
     } else {
-        // Full mode: standard window with decorations
-        let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
+        // Full mode: standard window with decorations.
+        // On primary build failure, retry with a safe-defaults builder that
+        // does not depend on any plugin-restored state (e.g. a corrupted
+        // window-state file from `tauri_plugin_window_state`).
+        let result = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
             .title("kusa")
             .inner_size(peek_config.size.width, peek_config.size.height)
             .min_inner_size(400.0, 300.0)
             .decorations(true)
             .visible(false)
-            .build()?;
-        window.show().ok();
+            .build();
+        let window = match result {
+            Ok(w) => w,
+            Err(e) => {
+                eprintln!(
+                    "Failed to create full window: {}, retrying with safe defaults",
+                    e
+                );
+                let safe = safe_default_full_size();
+                WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
+                    .title("kusa")
+                    .inner_size(safe.width, safe.height)
+                    .decorations(true)
+                    .visible(false)
+                    .build()?
+            }
+        };
+        if let Err(e) = window.show() {
+            eprintln!("Failed to show window: {}", e);
+        }
     }
 
     Ok(())
@@ -242,9 +271,13 @@ pub fn run() {
                 *mode = mode_str.to_string();
             }
 
-            // Create the window
+            // Create the window.
+            // If this fails (including the safe-defaults fallback for full
+            // mode), propagate the error so Tauri panics at startup rather
+            // than leaving a windowless zombie process.
             if let Err(e) = create_window(app, &peek_config) {
                 eprintln!("Fatal: failed to create window: {}", e);
+                return Err(e);
             }
 
             // Resolve file path to absolute, trying multiple base directories
@@ -331,4 +364,23 @@ pub fn run() {
                 }
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn safe_default_full_size_matches_full_size() {
+        let s = safe_default_full_size();
+        assert_eq!(s.width, FULL_SIZE.width);
+        assert_eq!(s.height, FULL_SIZE.height);
+    }
+
+    #[test]
+    fn safe_default_full_size_is_positive() {
+        let s = safe_default_full_size();
+        assert!(s.width > 0.0, "fallback width must be positive");
+        assert!(s.height > 0.0, "fallback height must be positive");
+    }
 }
