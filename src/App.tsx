@@ -11,7 +11,6 @@ import {
 } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { save, confirm } from "@tauri-apps/plugin-dialog";
 import { processMarkdown, extractHeadings } from "./lib/markdown";
@@ -30,6 +29,7 @@ import { createEditorLazyLoader, type CMEditorInstance } from "./lib/editor";
 import { createSyncEngine, type SyncEngineInstance } from "./lib/sync";
 import { createScrollSync, type ScrollSyncInstance } from "./lib/scroll-sync";
 import { createBufferSplitStore } from "./lib/bufferSplitStore";
+import { ensureWindowVisible } from "./utils/window-visibility";
 import type { InputContent, CliArgs } from "./lib/types";
 import type { Tab } from "./lib/tabStore";
 import Preview from "./components/Preview";
@@ -647,12 +647,12 @@ const App: Component = () => {
   onMount(async () => {
     // Safety net: if still loading after 2s, force transition to demo mode
     // and ensure the window is visible
-    const loadingTimeout = setTimeout(() => {
+    const loadingTimeout = setTimeout(async () => {
       if (viewMode() === "loading") {
         console.warn("[kusa] Loading timeout reached, falling back to demo mode");
         setViewMode("demo");
       }
-      getCurrentWindow().show().catch(() => {});
+      await ensureWindowVisible();
     }, 2000);
 
     try {
@@ -717,7 +717,7 @@ const App: Component = () => {
     } finally {
       // Always show the window and clear the timeout
       clearTimeout(loadingTimeout);
-      getCurrentWindow().show().catch(() => {});
+      await ensureWindowVisible();
     }
   });
 
