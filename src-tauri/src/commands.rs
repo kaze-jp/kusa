@@ -588,6 +588,24 @@ pub fn stop_file_watch(
     state.stop()
 }
 
+/// Flush any events buffered by the single-instance plugin callback
+/// before the frontend was ready to receive them. The frontend invokes
+/// this once after `setupTauriListeners` has registered all listeners.
+///
+/// See issue #70: the single-instance callback can fire before
+/// `tauri::Builder::setup()` completes (i.e. before the main window
+/// exists), so we buffer events instead of emitting them into the void.
+#[tauri::command]
+pub fn flush_pending_events(app: tauri::AppHandle) {
+    use tauri::{Emitter, Manager};
+    let state = app.state::<crate::PendingEventBuffer>();
+    crate::drain_pending_events(&state, |event, payload| {
+        if let Err(e) = app.emit(event, payload) {
+            eprintln!("Failed to emit {} from flush_pending_events: {}", event, e);
+        }
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -986,5 +1004,102 @@ mod tests {
     fn test_validate_key_too_long() {
         let long_key = "a".repeat(65);
         assert!(validate_key(&long_key).is_err());
+    }
+
+    // ---------------------------------------------------------------
+    // Tests for `drain_pending_events` (the pure helper that powers
+    // the `flush_pending_events` command). We test the helper directly
+    // because `tauri::AppHandle` is non-trivial to mock without a full
+    // Tauri runtime; the command is a one-line wrapper.
+    //
+    // See `crate::drain_pending_events` and `flush_pending_events`.
+    // ---------------------------------------------------------------
+
+    use crate::{drain_pending_events, PendingEventBuffer};
+    use std::sync::Arc;
+
+    #[test]
+    fn test_drain_pending_events_empty_buffer_is_noop() {
+        let buffer = PendingEventBuffer::default();
+        let mut calls: Vec<(String, String)> = Vec::new();
+        drain_pending_events(&buffer, |event, payload| {
+            calls.push((event.to_string(), payload));
+        });
+        assert!(calls.is_empty(), "no emits should occur for empty buffer");
+        let buf = buffer.0.lock().unwrap();
+        assert!(buf.is_empty(), "buffer must remain empty");
+    }
+
+    #[test]
+    fn test_drain_pending_events_drains_in_fifo_order() {
+        let buffer = PendingEventBuffer::default();
+        {
+            let mut buf = buffer.0.lock().unwrap();
+            buf.push(("cli-open".to_string(), "/path/a.md".to_string()));
+            buf.push(("cli-open".to_string(), "/path/b.md".to_string()));
+            buf.push(("cli-open".to_string(), "/path/c.md".to_string()));
+        }
+
+        let mut calls: Vec<(String, String)> = Vec::new();
+        drain_pending_events(&buffer, |event, payload| {
+            calls.push((event.to_string(), payload));
+        });
+
+        assert_eq!(calls.len(), 3);
+        assert_eq!(calls[0], ("cli-open".to_string(), "/path/a.md".to_string()));
+        assert_eq!(calls[1], ("cli-open".to_string(), "/path/b.md".to_string()));
+        assert_eq!(calls[2], ("cli-open".to_string(), "/path/c.md".to_string()));
+
+        let buf = buffer.0.lock().unwrap();
+        assert!(buf.is_empty(), "buffer must be empty after drain");
+    }
+
+    #[test]
+    fn test_drain_pending_events_drains_to_empty_even_if_closure_does_nothing() {
+        // Simulates a partial-failure scenario where the emit closure
+        // silently swallows entries. The buffer must still end up empty
+        // because `drain(..)` consumes all entries before the closure runs.
+        let buffer = PendingEventBuffer::default();
+        {
+            let mut buf = buffer.0.lock().unwrap();
+            buf.push(("cli-open".to_string(), "x".to_string()));
+            buf.push(("cli-open".to_string(), "y".to_string()));
+        }
+
+        drain_pending_events(&buffer, |_event, _payload| {
+            // pretend emit fails / does nothing
+        });
+
+        let buf = buffer.0.lock().unwrap();
+        assert!(
+            buf.is_empty(),
+            "buffer must be fully drained even if the emit closure is a no-op"
+        );
+    }
+
+    #[test]
+    fn test_drain_pending_events_poisoned_mutex_is_noop() {
+        // Poison the mutex by panicking inside the lock guard on a
+        // separate thread, then verify the drain helper does not panic.
+        let buffer = Arc::new(PendingEventBuffer::default());
+
+        let poisoner = Arc::clone(&buffer);
+        let _ = std::thread::spawn(move || {
+            let _guard = poisoner.0.lock().unwrap();
+            panic!("intentional poison");
+        })
+        .join();
+
+        // Mutex is now poisoned. The helper must NOT panic.
+        let mut calls: Vec<(String, String)> = Vec::new();
+        drain_pending_events(&buffer, |event, payload| {
+            calls.push((event.to_string(), payload));
+        });
+
+        // On poisoned mutex we skip silently: no calls made.
+        assert!(
+            calls.is_empty(),
+            "no emits should occur when mutex is poisoned"
+        );
     }
 }

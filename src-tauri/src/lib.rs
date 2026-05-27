@@ -22,6 +22,33 @@ pub struct CliArgsData {
 
 pub struct CliArgsState(pub Mutex<Option<CliArgsData>>);
 
+/// Buffers `(event_name, payload)` pairs emitted before the frontend
+/// is ready to receive them. Drained by the `flush_pending_events`
+/// command once the frontend has registered its Tauri event listeners.
+///
+/// See issue #70: `tauri_plugin_single_instance`'s callback can fire
+/// before `.setup()` completes, in which case the main webview window
+/// does not yet exist and any `emit` call would be dropped.
+#[derive(Default)]
+pub struct PendingEventBuffer(pub Mutex<Vec<(String, String)>>);
+
+/// Drain all buffered events from `PendingEventBuffer` and invoke
+/// `emit_fn` for each. On poisoned mutex, this is a silent no-op
+/// (we prefer to drop a few buffered events over panicking).
+///
+/// Extracted as a pure helper so it can be unit-tested without
+/// requiring a Tauri runtime / `AppHandle`.
+pub(crate) fn drain_pending_events<F>(buffer: &PendingEventBuffer, mut emit_fn: F)
+where
+    F: FnMut(&str, String),
+{
+    if let Ok(mut buf) = buffer.0.lock() {
+        for (event, payload) in buf.drain(..) {
+            emit_fn(&event, payload);
+        }
+    }
+}
+
 /// Determine PeekConfig from CLI args and stdin state.
 /// `screen_width` and `screen_height` are used for the "half" preset.
 fn resolve_peek_config(matches: &tauri_plugin_cli::Matches, screen_width: f64, screen_height: f64) -> PeekConfig {
@@ -136,15 +163,19 @@ fn resolve_and_emit<R: tauri::Runtime, E: Emitter<R>>(emitter: &E, raw_path: &st
     let canonical = match std::fs::canonicalize(&path) {
         Ok(p) => p,
         Err(_) => {
-            let _ = emitter.emit("cli-open", raw_path.to_string());
+            if let Err(e) = emitter.emit("cli-open", raw_path.to_string()) {
+                eprintln!("Failed to emit cli-open event: {}", e);
+            }
             return;
         }
     };
 
     if canonical.is_dir() {
-        let _ = emitter.emit("cli-open-dir", canonical.to_string_lossy().to_string());
-    } else {
-        let _ = emitter.emit("cli-open", canonical.to_string_lossy().to_string());
+        if let Err(e) = emitter.emit("cli-open-dir", canonical.to_string_lossy().to_string()) {
+            eprintln!("Failed to emit cli-open-dir event: {}", e);
+        }
+    } else if let Err(e) = emitter.emit("cli-open", canonical.to_string_lossy().to_string()) {
+        eprintln!("Failed to emit cli-open event: {}", e);
     }
 }
 
@@ -163,6 +194,7 @@ pub fn run() {
         .manage(WindowModeState::default())
         .manage(CliArgsState(Mutex::new(None)))
         .manage(watcher::FileWatcherState::default())
+        .manage(PendingEventBuffer::default())
         .invoke_handler(tauri::generate_handler![
             commands::read_file,
             commands::list_md_files,
@@ -178,11 +210,23 @@ pub fn run() {
             commands::get_cli_args,
             commands::start_file_watch,
             commands::stop_file_watch,
+            commands::flush_pending_events,
         ])
         .plugin(
             tauri_plugin_single_instance::init(|app, args, _cwd| {
+                // If a 2nd instance ships a path argument, we either emit
+                // it directly (window already exists) or buffer it for
+                // delivery once the frontend listeners are registered.
+                // See issue #70 — the single-instance callback can fire
+                // before `.setup()` completes the window builder.
                 if let Some(path) = args.get(1) {
-                    resolve_and_emit(app, path);
+                    if app.get_webview_window("main").is_some() {
+                        resolve_and_emit(app, path);
+                    } else if let Some(state) = app.try_state::<PendingEventBuffer>() {
+                        if let Ok(mut buf) = state.0.lock() {
+                            buf.push(("cli-open".to_string(), path.clone()));
+                        }
+                    }
                 }
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.set_focus();

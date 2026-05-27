@@ -264,6 +264,12 @@ const App: Component = () => {
       }
     });
 
+    // Flush any events the backend buffered before listeners were ready.
+    // The single-instance plugin callback can fire before .setup() completes
+    // (issue #70), in which case it pushes onto PendingEventBuffer instead of
+    // emitting. Now that all listeners are registered, drain that buffer.
+    await invoke("flush_pending_events").catch(() => {});
+
     onCleanup(() => {
       unlistenDir();
       unlistenFile();
