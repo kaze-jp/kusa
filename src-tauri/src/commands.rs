@@ -11,6 +11,13 @@ use walkdir::WalkDir;
 use crate::window_presets::FULL_SIZE;
 use crate::WindowModeState;
 
+/// Maximum file size accepted by `read_file` (64 MiB).
+///
+/// Files larger than this are rejected before being read into memory,
+/// to prevent OOM panics from accidentally opening huge non-markdown
+/// files (videos, logs, large JSON, etc.) via the `.md` association.
+pub(crate) const MAX_FILE_SIZE: u64 = 64 * 1024 * 1024;
+
 /// Directories to skip during recursive traversal.
 const SKIP_DIRS: &[&str] = &[
     ".git",
@@ -49,6 +56,17 @@ pub struct StdinState {
 pub fn read_file(path: String) -> Result<String, String> {
     let canonical = fs::canonicalize(&path)
         .map_err(|e| format!("Cannot resolve path '{}': {}", path, e))?;
+
+    let metadata = fs::metadata(&canonical)
+        .map_err(|e| format!("Cannot stat file '{}': {}", canonical.display(), e))?;
+
+    if metadata.len() > MAX_FILE_SIZE {
+        return Err(format!(
+            "File too large: {} bytes (max {} bytes)",
+            metadata.len(),
+            MAX_FILE_SIZE
+        ));
+    }
 
     fs::read_to_string(&canonical)
         .map_err(|e| format!("Cannot read file '{}': {}", canonical.display(), e))
@@ -639,6 +657,23 @@ mod tests {
         let result = read_file(file_path.to_string_lossy().to_string());
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "plain text content");
+    }
+
+    #[test]
+    fn test_read_file_oversize() {
+        // Use a sparse file (`set_len`) so we don't actually write 64MiB+ to disk.
+        let dir = TempDir::new().unwrap();
+        let file_path = dir.path().join("huge.md");
+        let file = fs::File::create(&file_path).unwrap();
+        file.set_len(MAX_FILE_SIZE + 1).unwrap();
+
+        let result = read_file(file_path.to_string_lossy().to_string());
+        assert!(result.is_err(), "expected Err for oversize file");
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("File too large"),
+            "error message should contain 'File too large', got: {err}"
+        );
     }
 
     #[test]
